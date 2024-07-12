@@ -1,0 +1,6 @@
+[submodule "crates/nfm"]
+	path = crates/nfm
+	url = https://github.com/frankiebaffa/nfm
+[submodule "crates/args"]
+	path = crates/args
+	url = https://github.com/frankiebaffa/args-rs

@@ -1,0 +1,128 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Deployment",
+	"description": "A set of deployment actions to compile an arcana project.",
+	"type": "object",
+	"properties": {
+		"actions": {
+			"description": "The list of actions to compile the project.",
+			"type": "array",
+			"items": {
+				"description": "A deployment action.",
+				"type": "object",
+				"properties": {
+					"compile-file": {
+						"description": "Compile an arcana template file.",
+						"type": "object",
+						"properties": {
+							"source": {
+								"description": "The path to the template file.",
+								"type": "string"
+							},
+							"destination": {
+								"description": "The path to the output file.",
+								"type": "string"
+							}
+						},
+						"required": [ "source", "destination" ]
+					},
+					"compile-directory": {
+						"description": "Compile arcana templates within a directory.",
+						"type": "object",
+						"properties": {
+							"source": {
+								"description": "The source directory options.",
+								"type": "object",
+								"properties": {
+									"directory": {
+										"description": "The path to the directory.",
+										"type": "string"
+									},
+									"extensions": {
+										"description": "The file extensions to include.",
+										"type": "array",
+										"items": {
+											"description": "An extension to include.",
+											"type": "string"
+										}
+									}
+								},
+								"required": [ "directory" ]
+							},
+							"destination": {
+								"description": "The destination directory options.",
+								"type": "object",
+								"properties": {
+									"directory": {
+										"description": "The path to the output directory.",
+										"type": "string"
+									},
+									"extension": {
+										"description": "The output file extension.",
+										"type": "string"
+									}
+								},
+								"required": [ "directory" ]
+							}
+						},
+						"required": [ "source", "destination" ]
+					},
+					"copy-file": {
+						"description": "Copy a file.",
+						"type": "object",
+						"properties": {
+							"source": {
+								"description": "The path to the file.",
+								"type": "string"
+							},
+							"destination": {
+								"description": "The path to the output file.",
+								"type": "string"
+							}
+						},
+						"required": [ "source", "destination" ]
+					},
+					"copy-directory": {
+						"description": "Copy files within a directory.",
+						"type": "object",
+						"properties": {
+							"source": {
+								"description": "The path to the source directory.",
+								"type": "string"
+							},
+							"destination": {
+								"description": "The path to the destination directory.",
+								"type": "string"
+							},
+							"extensions": {
+								"description": "File extensions to include.",
+								"type": "array",
+								"items": {
+									"description": "An extension to include.",
+									"type": "string"
+								}
+							}
+						},
+						"required": [ "source", "destination" ]
+					}
+				},
+				"oneOf": [
+					{
+						"required": [ "compile-file" ]
+					},
+					{
+						"required": [ "compile-directory" ]
+					},
+					{
+						"required": [ "copy-file" ]
+					},
+					{
+						"required": [ "copy-directory" ]
+					}
+				]
+			},
+			"minItems": 1
+		}
+	},
+	"required": [ "actions" ]
+}

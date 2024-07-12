@@ -1,0 +1,10 @@
+[package]
+name = "arcana-core"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies.nfm-core]
+path = "../crates/nfm/nfm-core"
+
+[dependencies.serde_json]
+version = "1.0.117"

@@ -1,0 +1,7 @@
+{
+	"name": "Should be the Name",
+	"template": "template.arcana",
+	"contexts": [
+		"ctx2.json"
+	]
+}

@@ -1,0 +1,2 @@
+={ obj.path | path }-
+{path/to/file.txt}${ obj.path | path }

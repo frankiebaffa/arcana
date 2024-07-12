@@ -1,0 +1,4 @@
+.{"ctx.json"}
+={$root}<{obj}
+${value}
+${obj.value}

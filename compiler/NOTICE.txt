@@ -1,0 +1,4 @@
+arcc  Copyright (C) 2024  Frankie Baffa
+This program comes with ABSOLUTELY NO WARRANTY; for details type `arcc -L'.
+This is free software, and you are welcome to redistribute it
+under certain conditions.

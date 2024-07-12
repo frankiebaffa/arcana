@@ -1,0 +1,10 @@
+[package]
+name = "arcc"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies.args]
+path = "../crates/args"
+
+[dependencies.arcana-core]
+path = "../core"

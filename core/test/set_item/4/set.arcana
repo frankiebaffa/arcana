@@ -1,0 +1,6 @@
+={ obj.paths | array | path }-
+{path/to/file.txt}-
+{../../different/file.txt}-
+{/absolute/path.txt}@{ path in obj.paths | paths }-
+{%{ !$loop.first }{
+}${ path }}

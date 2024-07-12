@@ -1,0 +1,4 @@
+{
+	"path": "path/to/first.file",
+	"the_other_path": "../path/to/third.file"
+}

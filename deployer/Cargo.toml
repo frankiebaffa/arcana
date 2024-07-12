@@ -1,0 +1,17 @@
+[package]
+name = "arcd"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies.args]
+path = "../crates/args"
+
+[dependencies.serde]
+version = "1.0.203"
+features = [ "derive" ]
+
+[dependencies.serde_json]
+version = "1.0.117"
+
+[dependencies.arcana-core]
+path = "../core"

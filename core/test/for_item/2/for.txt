@@ -1,0 +1,6 @@
+.{ "ctx.json" }
+@{ file in files | paths }-
+{%{ !$loop.first }{
+}&{ file }}-
+{No items.}
+End.

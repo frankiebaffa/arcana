@@ -1,0 +1,13 @@
+arcc - The compiler for the Arcana Templating Engine
+
+usage:
+  arcc -h
+  arcc -V
+  arcc TEMPLATE
+
+arguments:
+  -h  --help     Displays this help message.
+  -V  --version  Prints the version information.
+
+positionals:
+  TEMPLATE  The path to the template to parse.

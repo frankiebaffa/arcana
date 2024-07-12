@@ -1,0 +1,3 @@
+.{ "ctx.json" }
++{ template }
+This should be saved as $content.

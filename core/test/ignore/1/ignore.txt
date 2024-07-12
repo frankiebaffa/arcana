@@ -1,0 +1,3 @@
+!{ this file is ignored for testing }!
+
+This content should not show up in the output.
