@@ -49,4 +49,7 @@ pub(crate)
 const UNSET_ITEM: &str = "\\/{";
 
 pub(crate)
+const BLOCK: &str = "\\{";
+
+pub(crate)
 const ENDBLOCK: &str = "\\}";

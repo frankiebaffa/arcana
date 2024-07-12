@@ -2159,7 +2159,8 @@ impl Parser {
             self.src().pos().starts_with(consts::block::esc::INCLUDE_CONTENT) ||
             self.src().pos().starts_with(consts::block::esc::EXPRESSION) ||
             self.src().pos().starts_with(consts::block::esc::SET_ITEM) ||
-            self.src().pos().starts_with(consts::block::esc::UNSET_ITEM)
+            self.src().pos().starts_with(consts::block::esc::UNSET_ITEM) ||
+            self.src().pos().starts_with(consts::block::esc::BLOCK)
         {
             self.src_mut().take(consts::block::esc::ESCAPE.len());
             let taken = self.src_mut().take(2).unwrap();
