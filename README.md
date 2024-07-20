@@ -154,8 +154,8 @@ with the _markdown_ modifier.
 &{pathlike|md}
 ```
 
-Parses the output of the include as _No-Flavor Markdown_. Can be used in
-conjunction with the _raw_ modifier.
+Parses the output of the include as [No-Flavor Markdown](http://frankiebaffa.com/software/nfm.html).
+Can be used in conjunction with the _raw_ modifier.
 
 ### If
 
