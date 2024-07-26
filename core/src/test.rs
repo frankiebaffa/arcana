@@ -492,27 +492,19 @@ fn full_2() {
     p.parse().unwrap();
     assert_eq!(
         concat!(
-            "\n",
+            "<div class=\"toc\">\n",
+            "\t<p>Parent</p>\n",
             "\t\n",
-            "\t\t\t\t\t\t<div class=\"toc\">\n",
-            "\t\t\t<p>Parent</p>\n",
-            "\t\t\t\n",
-            "\t\t\t\t\t\t\t\t\n",
+            "\t\t\n",
+            "\t\t<div class=\"toc\">\n",
+            "\t<a href=\"https://duckduckgo.com\">First</a>\n",
             "\t\n",
-            "\t\t\t\t\t\t<div class=\"toc\">\n",
-            "\t\t\t<a href=\"https://duckduckgo.com\">Parent</a>\n",
-            "\t\t\t\n",
-            "\t\t</div>\n",
+            "</div><div class=\"toc\">\n",
+            "\t<a href=\"https://start.duckduckgo.com\">Second</a>\n",
             "\t\n",
-            "\t\t\t\t\t\t<div class=\"toc\">\n",
-            "\t\t\t<a href=\"https://start.duckduckgo.com\">Parent</a>\n",
-            "\t\t\t\n",
-            "\t\t</div>\n",
+            "</div>\n",
             "\t\n",
-            "\n",
-            "\t\t\t\n",
-            "\t\t</div>\n",
-            "\t\n"
+            "</div>",
         ),
         p.as_output()
     );

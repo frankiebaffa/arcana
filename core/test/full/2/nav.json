@@ -4,11 +4,11 @@
 			"text": "Parent",
 			"children": [
 				{
-					"name": "First",
+					"text": "First",
 					"href": "https://duckduckgo.com"
 				},
 				{
-					"name": "Second",
+					"text": "Second",
 					"href": "https://start.duckduckgo.com"
 				}
 			]

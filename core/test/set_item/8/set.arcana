@@ -1,6 +1,5 @@
 %{the-item}{
-	={$root}<{the-item}
-	${name}
+		={$root}<{the-item}${name}
 }{
 	No name.
 }
