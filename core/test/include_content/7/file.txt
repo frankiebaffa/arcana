@@ -1,5 +1,4 @@
-.{ "ctx.json" }
-${ desc | split 4 0 }
+.{ "ctx.json" }${ desc | split 4 0 }
 ${ desc | split 4 1 }
 ${ desc | split 4 2 }
 ${ desc | split 4 3 }

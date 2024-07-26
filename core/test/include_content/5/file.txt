@@ -1,2 +1,1 @@
-.{ "ctx.json" }
-${ desc | split 2 1 }
+.{ "ctx.json" }${ desc | split 2 1 }

@@ -1,4 +1,3 @@
-.{ "ctx.json" }
-%{ name }-
+.{ "ctx.json" }%{ name }-
 {${name}}-
 {No name.}

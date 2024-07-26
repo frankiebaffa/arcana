@@ -1,2 +1,1 @@
-.{ "ctx.json" }
-${ name | upper }
+.{ "ctx.json" }${ name | upper }

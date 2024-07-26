@@ -1,2 +1,1 @@
-.{ "ctx.json" }
-${ name }${ nothing? }
+.{ "ctx.json" }${ name }${ nothing? }

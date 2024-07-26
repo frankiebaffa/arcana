@@ -1,0 +1,1 @@
+.{"./ctx.json"|as item}\section*\{${item.name}\}

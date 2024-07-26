@@ -1,2 +1,1 @@
-.{ "ctx.json" }
-${ name | replace "e" "X" }
+.{ "ctx.json" }${ name | replace "e" "X" }

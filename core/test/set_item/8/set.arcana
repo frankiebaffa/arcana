@@ -1,0 +1,6 @@
+%{the-item}{
+	={$root}<{the-item}
+	${name}
+}{
+	No name.
+}

@@ -1,0 +1,17 @@
+{
+	"nav": [
+		{
+			"text": "Parent",
+			"children": [
+				{
+					"name": "First",
+					"href": "https://duckduckgo.com"
+				},
+				{
+					"name": "Second",
+					"href": "https://start.duckduckgo.com"
+				}
+			]
+		}
+	]
+}

@@ -89,6 +89,7 @@ enum UnsetItemMod {
 }
 
 /// The parser for Arcana templates.
+#[derive(Debug)]
 pub
 struct Parser {
     path: PathBuf,
@@ -329,9 +330,6 @@ impl Parser {
             }
 
             self.src_mut().take(1);
-            if self.src().pos().starts_with(consts::block::esc::ENDBLOCK) {
-                self.esc_endblock();
-            }
         }
 
         self.src_mut().take(end.len()).unwrap();
@@ -347,10 +345,6 @@ impl Parser {
             ))?;
             self.src_mut().force_eof();
 
-            // if immediately followed by a line break, skip
-            if self.src().pos().starts_with('\n') {
-                self.src_mut().take(1);
-            }
             Ok(true)
         }
         else {
@@ -366,10 +360,6 @@ impl Parser {
                 self.src().file().to_owned(),
             ))?;
 
-            // if immediately followed by a line break, skip
-            if self.src().pos().starts_with('\n') {
-                self.src_mut().take(1);
-            }
             Ok(true)
         }
         else {
@@ -560,11 +550,6 @@ impl Parser {
 
         self.extends = Some(path);
 
-        // if extends is followed by an immediate line break, skip
-        if self.src().pos().starts_with('\n') {
-            self.src_mut().take(1);
-        }
-
         Ok(true)
     }
 
@@ -644,11 +629,6 @@ impl Parser {
         }
         else {
             self.read_ctx_in(path)?;
-        }
-
-        // if a source is followed by an immedate line break, ignore
-        if self.src().pos().starts_with('\n') {
-            self.src_mut().take(1);
         }
 
         Ok(true)
@@ -1996,7 +1976,7 @@ impl Parser {
             }
             self.src_mut().take(1);
 
-            if alias.eq(consts::ROOT) {
+            if alias.eq(consts::ROOT) && !bypass {
                 match self.get_value(&clone_from)?.to_owned() {
                     JsonValue::Object(obj) => {
                         for (k, v) in obj.into_iter() {
@@ -2010,11 +1990,6 @@ impl Parser {
             }
             else {
                 self.clone_value(clone_from, alias)?;
-            }
-
-            // if immediately followed by a line break, skip
-            if self.src().pos().starts_with('\n') {
-                self.src_mut().take(1);
             }
 
             return Ok(true);
@@ -2057,11 +2032,6 @@ impl Parser {
                 }
                 break;
             }
-        }
-
-        // if immediately followed by a line break, skip
-        if self.src().pos().starts_with('\n') {
-            self.src_mut().take(1);
         }
 
         Ok(true)
@@ -2128,11 +2098,6 @@ impl Parser {
             self.remove_value(alias);
         }
 
-        // if immediately followed by a line break, skip
-        if self.src().pos().starts_with('\n') {
-            self.src_mut().take(1);
-        }
-
         Ok(true)
     }
 
@@ -2159,15 +2124,16 @@ impl Parser {
             self.src().pos().starts_with(consts::block::esc::INCLUDE_CONTENT) ||
             self.src().pos().starts_with(consts::block::esc::EXPRESSION) ||
             self.src().pos().starts_with(consts::block::esc::SET_ITEM) ||
-            self.src().pos().starts_with(consts::block::esc::UNSET_ITEM) ||
-            self.src().pos().starts_with(consts::block::esc::BLOCK)
+            self.src().pos().starts_with(consts::block::esc::UNSET_ITEM)
         {
             self.src_mut().take(consts::block::esc::ESCAPE.len());
             let taken = self.src_mut().take(2).unwrap();
             self.output.push_str(&taken);
         }
         // is escaped (1 char pattern)
-        else if self.src().pos().starts_with(consts::block::esc::ENDBLOCK) {
+        else if self.src().pos().starts_with(consts::block::esc::BLOCK) ||
+            self.src().pos().starts_with(consts::block::esc::ENDBLOCK)
+        {
             self.esc_endblock();
         }
         // is ignored

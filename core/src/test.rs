@@ -132,6 +132,16 @@ fn source_struct_1() {
 }
 
 #[test]
+fn escape_1() {
+    let mut p = Parser::new("test/escape/1/escape.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!(
+        "\\section*{The name.}",
+        p.as_output()
+    );
+}
+
+#[test]
 fn parser_1() {
     let mut cf = current_dir().unwrap();
     cf.push("test/parser/1/test.txt");
@@ -212,6 +222,13 @@ fn comment_3() {
     let mut p = Parser::new("test/comment/3/comment.arcana").unwrap();
     p.parse().unwrap();
     assert_eq!("And this is some text here.", p.as_output());
+}
+
+#[test]
+fn comment_4() {
+    let mut p = Parser::new("test/comment/4/comment.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("", p.as_output());
 }
 
 #[test]
@@ -470,6 +487,38 @@ fn full_1() {
 }
 
 #[test]
+fn full_2() {
+    let mut p = Parser::new("test/full/2/base.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!(
+        concat!(
+            "\n",
+            "\t\n",
+            "\t\t\t\t\t\t<div class=\"toc\">\n",
+            "\t\t\t<p>Parent</p>\n",
+            "\t\t\t\n",
+            "\t\t\t\t\t\t\t\t\n",
+            "\t\n",
+            "\t\t\t\t\t\t<div class=\"toc\">\n",
+            "\t\t\t<a href=\"https://duckduckgo.com\">Parent</a>\n",
+            "\t\t\t\n",
+            "\t\t</div>\n",
+            "\t\n",
+            "\t\t\t\t\t\t<div class=\"toc\">\n",
+            "\t\t\t<a href=\"https://start.duckduckgo.com\">Parent</a>\n",
+            "\t\t\t\n",
+            "\t\t</div>\n",
+            "\t\n",
+            "\n",
+            "\t\t\t\n",
+            "\t\t</div>\n",
+            "\t\n"
+        ),
+        p.as_output()
+    );
+}
+
+#[test]
 fn set_item_1() {
     let mut p = Parser::new("test/set_item/1/set.arcana").unwrap();
     p.parse().unwrap();
@@ -533,6 +582,20 @@ fn set_item_7() {
     let mut p = Parser::new("test/set_item/7/set.arcana").unwrap();
     p.parse().unwrap();
     assert_eq!("This is the value\nThis is the value", p.as_output());
+}
+
+#[test]
+fn set_item_8_has_item() {
+    let mut p = Parser::new("test/set_item/8/has-item.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("\n\t\tHere is the name.\n", p.as_output());
+}
+
+#[test]
+fn set_item_8_no_item() {
+    let mut p = Parser::new("test/set_item/8/no-item.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("\n\tNo name.\n", p.as_output());
 }
 
 #[test]

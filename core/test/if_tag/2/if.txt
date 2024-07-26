@@ -1,3 +1,2 @@
-.{ "ctx.json" }
-%{ !name }{No Name}{${ name }}
+.{ "ctx.json" }%{ !name }{No Name}{${ name }}
 %{ details }{%{ details.age }{${ details.age }}{No Age}}{No details}

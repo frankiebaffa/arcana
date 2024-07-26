@@ -1,7 +1,5 @@
 ={ obj.arr | array }-
 {First}-
-{Second}
-/{ obj.arr | pop }
-@{ item in obj.arr }-
+{Second}/{ obj.arr | pop }@{ item in obj.arr }-
 {%{ !$loop.first }{
 }${ item}}

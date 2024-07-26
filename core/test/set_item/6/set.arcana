@@ -1,4 +1,2 @@
-.{"ctx.json"}
-={obj.next}<{obj.value}
-${obj.next}
+.{"ctx.json"}={obj.next}<{obj.value}${obj.next}
 ${obj.value}

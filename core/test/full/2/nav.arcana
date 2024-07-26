@@ -1,0 +1,13 @@
+%{nav}{
+	@{item in nav}{
+		/{children}
+		={$root}<{item}
+		<div class="toc">
+			%{href}{<a href="${href}">${text}</a>}{<p>${text}</p>}
+			%{children}{
+				={nav}<{children}
+				&{"./nav.arcana"}
+			}
+		</div>
+	}
+}

@@ -1,3 +1,2 @@
-.{ "ctx1.json" }
+.{ "ctx1.json" }${ desc }&{ "file2.txt" }
 ${ desc }
-&{ "file2.txt" }${ desc }
