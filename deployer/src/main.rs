@@ -265,7 +265,12 @@ fn main() -> Result<()> {
                     let mut dest = cdir.destination.to_owned();
                     create_dir_all(&dest).map_err(|e| Error::IO(e, dpath.clone()))?;
 
-                    dest.push(format!("{filename}.{ext}"));
+                    if ext.is_empty() {
+                        dest.push(format!("{filename}"));
+                    }
+                    else {
+                        dest.push(format!("{filename}.{ext}"));
+                    }
 
                     vprint!("  To {dest:?}");
 
