@@ -26,9 +26,10 @@ use {
             create_dir_all,
             copy,
             read_to_string,
+            read_dir,
             write,
         },
-        path::PathBuf,
+        path::{ Path, PathBuf, },
         process::exit as pexit,
     },
     arcana_core::{ Error, Parser, Result, },
@@ -96,6 +97,58 @@ struct Options {
 const HELP: &str = include_str!("../resources/help.txt");
 const NOTICE: &str = include_str!("../NOTICE.txt");
 const LICENSE: &str = include_str!("../../LICENSE.md");
+
+fn copy_dir_all<P1, P2>(verbose: bool, dpath: PathBuf, extensions: Vec<String>, src: P1, dst: P2) -> Result<()>
+where
+    P1: AsRef<Path>,
+    P2: AsRef<Path>
+{
+    macro_rules! vprint {
+        ($msg:expr$(, $fmt:expr)*) => {
+            if verbose {
+                println!($msg$(, $fmt)*);
+            }
+        }
+    }
+
+    for entry in read_dir(src).map_err(|e| Error::IO(e, dpath.clone()))? {
+        let entry = entry.map_err(|e| Error::IO(e, dpath.clone()))?;
+        let ty = entry.file_type().map_err(|e| Error::IO(e, dpath.clone()))?;
+
+        if ty.is_dir() {
+            copy_dir_all(verbose, dpath.clone(), extensions.clone(), entry.path(), dst.as_ref().join(entry.file_name()))?;
+        }
+        else {
+            let ext = entry.path().extension().map(|v| v.to_str().unwrap_or("")).unwrap_or("").to_owned();
+
+            if extensions.is_empty() || extensions.contains(&ext) {
+                create_dir_all(&dst).map_err(|e| Error::IO(e, dpath.clone()))?;
+                vprint!("Copying file {:?}", entry.path());
+                copy(entry.path(), dst.as_ref().join(entry.file_name())).map_err(|e| Error::IO(e, dpath.clone()))?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn copy_to_dest(verbose: bool, dpath: PathBuf, cdir: CopyDirectory) -> Result<()> {
+    macro_rules! vprint {
+        ($msg:expr$(, $fmt:expr)*) => {
+            if verbose {
+                println!($msg$(, $fmt)*);
+            }
+        }
+    }
+
+    vprint!("Copying directory {:?}", cdir.source);
+
+    let extensions = cdir.extensions.unwrap_or(Vec::new());
+
+    copy_dir_all(verbose, dpath, extensions, cdir.source, cdir.destination)?;
+
+    Ok(())
+}
 
 fn main() -> Result<()> {
     let mut opts = Options::default();
@@ -233,49 +286,7 @@ fn main() -> Result<()> {
                 copy(&cfile.source, &cfile.destination).map_err(|e| Error::IO(e, dpath.clone()))?;
             },
             Action::CopyDirectory(cdir) => {
-                vprint!("Copying directory {:?}", cdir.source);
-
-                for e_res in cdir.source.read_dir().map_err(|e| Error::IO(e, dpath.clone()))? {
-                    let entry = e_res.map_err(|e| Error::IO(e, dpath.clone()))?;
-                    let path = entry.path();
-
-                    if !path.is_file() {
-                        continue;
-                    }
-
-                    vprint!("  Copying file {path:?}");
-
-                    let filename = path.file_stem()
-                        .map(|v| v.to_str().unwrap_or(""))
-                        .or(Some(""))
-                        .map(|v| v.to_owned())
-                        .unwrap();
-                    let ext = path.extension()
-                        .map(|v| v.to_str().unwrap_or(""))
-                        .or(Some(""))
-                        .map(|v| v.to_owned())
-                        .unwrap();
-
-                    if let Some(exts) = &cdir.extensions {
-                        if !exts.is_empty() && !exts.contains(&ext) {
-                            continue;
-                        }
-                    }
-
-                    let mut dest = cdir.destination.to_owned();
-                    create_dir_all(&dest).map_err(|e| Error::IO(e, dpath.clone()))?;
-
-                    if ext.is_empty() {
-                        dest.push(format!("{filename}"));
-                    }
-                    else {
-                        dest.push(format!("{filename}.{ext}"));
-                    }
-
-                    vprint!("  To {dest:?}");
-
-                    copy(&path, dest).map_err(|e| Error::IO(e, dpath.clone()))?;
-                }
+                copy_to_dest(verbose, dpath.clone(), cdir)?;
             },
         }
     }
