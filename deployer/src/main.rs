@@ -23,10 +23,12 @@ use {
     serde_json::from_str as from_json_str,
     std::{
         fs::{
-            create_dir_all,
+            canonicalize,
             copy,
-            read_to_string,
+            create_dir_all,
             read_dir,
+            read_to_string,
+            remove_file,
             write,
         },
         path::{ Path, PathBuf, },
@@ -62,6 +64,28 @@ struct CompileDirectory {
 }
 
 #[derive(Deserialize)]
+struct CompileAgainstDestination {
+    directory: PathBuf,
+    extension: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct CompileAgainstDirectory {
+    path: PathBuf,
+    extensions: Option<Vec<String>>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct CompileAgainst {
+    template: PathBuf,
+    destination: CompileAgainstDestination,
+    context: Option<PathBuf>,
+    contexts: Option<Vec<PathBuf>>,
+    context_directory: Option<CompileAgainstDirectory>,
+}
+
+#[derive(Deserialize)]
 struct CopyFile {
     source: PathBuf,
     destination: PathBuf,
@@ -75,12 +99,20 @@ struct CopyDirectory {
 }
 
 #[derive(Deserialize)]
+struct DeleteFile {
+    file: Option<PathBuf>,
+    files: Option<Vec<PathBuf>>,
+}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 enum Action {
     CompileFile(CompileFile),
     CompileDirectory(CompileDirectory),
+    CompileAgainst(CompileAgainst),
     CopyFile(CopyFile),
     CopyDirectory(CopyDirectory),
+    DeleteFile(DeleteFile),
 }
 
 #[derive(Deserialize)]
@@ -275,6 +307,144 @@ fn main() -> Result<()> {
                     write(dest, parser.as_output()).map_err(|e| Error::IO(e, dpath.clone()))?;
                 }
             },
+            Action::CompileAgainst(opts) => {
+                if let Some(context) = opts.context {
+                    vprint!("Compiling {:?} against context {:?}", opts.template, context);
+                    vprint!("  To {:?}", opts.destination.directory);
+
+                    let filename = context.file_stem()
+                        .map(|v| v.to_str().unwrap_or(""))
+                        .or(Some(""))
+                        .map(|v| v.to_owned())
+                        .unwrap();
+
+                    let context_path = canonicalize(&context)
+                        .map_err(|e| Error::IO(e, context))?;
+                    let mut p = Parser::new_with_context(opts.template, context_path)?;
+                    p.parse()?;
+
+                    let mut dest = opts.destination.directory.clone();
+                    if let Some(ext) = &opts.destination.extension {
+                        dest.push(format!("{filename}.{ext}"));
+                    }
+                    else {
+                        dest.push(format!("{filename}"));
+                    }
+
+                    vprint!("  Writing to {dest:?}");
+
+                    let mut dir = dest.clone();
+                    dir.pop();
+                    create_dir_all(dir).map_err(|e| Error::IO(e, dpath.clone()))?;
+
+                    write(dest, p.as_output()).map_err(|e| Error::IO(e, dpath.clone()))?;
+                }
+                else if let Some(contexts) = opts.contexts {
+                    for context in contexts {
+                        let template = opts.template.clone();
+
+                        vprint!("Compiling {:?} against context {:?}", template, context);
+                        vprint!("  To {:?}", opts.destination.directory);
+
+                        let filename = context.file_stem()
+                            .map(|v| v.to_str().unwrap_or(""))
+                            .or(Some(""))
+                            .map(|v| v.to_owned())
+                            .unwrap();
+
+                        let context_path = canonicalize(&context)
+                            .map_err(|e| Error::IO(e, context))?;
+                        let mut p = Parser::new_with_context(template, context_path)?;
+                        p.parse()?;
+
+                        let mut dest = opts.destination.directory.clone();
+                        if let Some(ext) = &opts.destination.extension {
+                            dest.push(format!("{filename}.{ext}"));
+                        }
+                        else {
+                            dest.push(format!("{filename}"));
+                        }
+
+                        vprint!("  Writing to {dest:?}");
+
+                        let mut dir = dest.clone();
+                        dir.pop();
+                        create_dir_all(dir).map_err(|e| Error::IO(e, dpath.clone()))?;
+
+                        write(dest, p.as_output()).map_err(|e| Error::IO(e, dpath.clone()))?;
+                    }
+                }
+                else if let Some(directory) = opts.context_directory {
+                    vprint!(
+                        "Compiling {:?} against context directory {:?}",
+                        opts.template,
+                        directory.path
+                    );
+
+                    for e_res in directory.path.read_dir().map_err(|e| Error::IO(e, dpath.clone()))? {
+                        let template = opts.template.clone();
+
+                        let entry = e_res.map_err(|e| Error::IO(e, dpath.clone()))?;
+                        let context = entry.path();
+
+                        if !context.is_file() {
+                            continue;
+                        }
+
+                        let ext = context.extension()
+                            .map(|v| v.to_str().unwrap_or(""))
+                            .or(Some(""))
+                            .map(|v| v.to_owned())
+                            .unwrap();
+
+                        if let Some(exts) = &directory.extensions {
+                            if !exts.is_empty() && !exts.contains(&ext) {
+                                continue;
+                            }
+                        }
+
+                        vprint!("Compiling {:?} against context {:?}", template, context);
+                        vprint!("  To {:?}", opts.destination.directory);
+
+                        let filename = context.file_stem()
+                            .map(|v| v.to_str().unwrap_or(""))
+                            .or(Some(""))
+                            .map(|v| v.to_owned())
+                            .unwrap();
+
+                        let context_path = canonicalize(&context)
+                            .map_err(|e| Error::IO(e, context))?;
+                        let mut p = Parser::new_with_context(template, context_path)?;
+                        p.parse()?;
+
+                        let mut dest = opts.destination.directory.clone();
+                        if let Some(ext) = &opts.destination.extension {
+                            dest.push(format!("{filename}.{ext}"));
+                        }
+                        else {
+                            dest.push(format!("{filename}"));
+                        }
+
+                        vprint!("  Writing to {dest:?}");
+
+                        let mut dir = dest.clone();
+                        dir.pop();
+                        create_dir_all(dir).map_err(|e| Error::IO(e, dpath.clone()))?;
+
+                        write(dest, p.as_output()).map_err(|e| Error::IO(e, dpath.clone()))?;
+                    }
+                }
+                else {
+                    eprintln!(concat!(
+                        "Action \"compile-against\" requires at least one of [ ",
+                        "\"context\", ",
+                        "\"contexts\", ",
+                        "\"context-directory\" ]."
+                    ));
+
+                    pexit(1);
+                }
+            },
             Action::CopyFile(cfile) => {
                 vprint!("Copying file {:?}", cfile.source);
                 vprint!("  To {:?}", cfile.destination);
@@ -287,6 +457,33 @@ fn main() -> Result<()> {
             },
             Action::CopyDirectory(cdir) => {
                 copy_to_dest(verbose, dpath.clone(), cdir)?;
+            },
+            Action::DeleteFile(delete) => {
+                if let Some(file) = delete.file {
+                    vprint!("Deleting file {:?}", file);
+
+                    remove_file(&file).map_err(|e| Error::IO(e, file))?;
+
+                    vprint!("  Deleted");
+                }
+                else if let Some(files) = delete.files {
+                    for file in files {
+                        vprint!("Deleting file {:?}", file);
+
+                        remove_file(&file).map_err(|e| Error::IO(e, file))?;
+
+                        vprint!("  Deleted");
+                    }
+                }
+                else {
+                    eprintln!(concat!(
+                        "Action \"delete-file\" requires at least one of [ ",
+                        "\"file\", ",
+                        "\"files\" ]."
+                    ));
+
+                    pexit(1);
+                }
             },
         }
     }

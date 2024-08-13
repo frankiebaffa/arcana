@@ -21,6 +21,9 @@ pub(crate)
 const EXT: &str = "ext";
 
 pub(crate)
+const FILENAME: &str = "filename";
+
+pub(crate)
 const REPLACE: &str = "replace";
 
 pub(crate)

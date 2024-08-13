@@ -374,6 +374,14 @@ fn include_content_8() {
 }
 
 #[test]
+fn include_content_9() {
+    let mut p = Parser::new("test/include_content/9/file.arcana").unwrap();
+    p.parse().unwrap();
+    let against = include_str!("../test/include_content/9/against.txt");
+    assert_eq!(against[0..against.len()-1], p.as_output());
+}
+
+#[test]
 fn include_file_1() {
     let mut p = Parser::new("test/include_file/1/file1.txt").unwrap();
     p.parse().unwrap();

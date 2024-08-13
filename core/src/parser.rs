@@ -45,6 +45,7 @@ use {
 
 #[derive(PartialEq)]
 enum IncludeContentMod {
+    Filename,
     Upper,
     Lower,
     Path,
@@ -303,6 +304,33 @@ impl Parser {
         P: AsRef<Path>
     {
         Self::new_internal(path, None)
+    }
+
+    /// Create a new parser with a specific context.
+    ///
+    /// # Arguments
+    ///
+    /// * `template` - The path to the template.
+    /// * `context` - The path to the context.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use {
+    ///     arcana_core::Parser,
+    ///     std::fs::canonicalize,
+    /// };
+    ///
+    /// Parser::new_with_context("test/full/1/page.html", canonicalize("test/full/1/page.json").unwrap()).unwrap();
+    /// ```
+    pub
+    fn new_with_context<T, C>(template: T, context: C) -> Result<Self>
+    where
+        T: AsRef<Path>,
+        C: AsRef<Path>
+    {
+        let ctx = JsonContext::read(context)?;
+        Self::new_internal(template, Some(ctx))
     }
 
     fn esc_endblock(&mut self) {
@@ -654,6 +682,10 @@ impl Parser {
                 self.src_mut().take(consts::modif::PATH.len());
                 mods.push(IncludeContentMod::Path);
             }
+            else if self.src().pos().starts_with(consts::modif::FILENAME) {
+                self.src_mut().take(consts::modif::FILENAME.len());
+                mods.push(IncludeContentMod::Filename);
+            }
             else if self.src().pos().starts_with(consts::modif::UPPER) {
                 self.src_mut().take(consts::modif::UPPER.len());
                 mods.push(IncludeContentMod::Upper);
@@ -863,6 +895,13 @@ impl Parser {
                     IncludeContentMod::Replace(from, to) => value
                         .replace(&from, &to),
                     IncludeContentMod::Path => value,
+                    IncludeContentMod::Filename => {
+                        let p = PathBuf::from(value);
+                        p.file_stem().map(|f| f.to_str())
+                            .flatten()
+                            .map(|f| f.to_owned())
+                            .unwrap_or(String::new())
+                    },
                     IncludeContentMod::Split(into, idx) => {
                         let l = value.len();
                         if into > l {

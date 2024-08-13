@@ -67,6 +67,81 @@
 						},
 						"required": [ "source", "destination" ]
 					},
+					"compile-against": {
+						"description": "Compile a single template against one or multiple contexts.",
+						"type": "object",
+						"properties": {
+							"template": {
+								"description": "The path to the template.",
+								"type": "string"
+							},
+							"destination": {
+								"description": "The output options.",
+								"type": "object",
+								"properties": {
+									"directory": {
+										"description": "The directory to which to output the compiled files.",
+										"type": "string"
+									},
+									"extension": {
+										"description": "The file extension for the compiled files.",
+										"type": "string"
+									}
+								},
+								"required": [ "directory" ]
+							},
+							"context": {
+								"description": "A path to a context.",
+								"type": "string"
+							},
+							"contexts": {
+								"description": "A list of paths to each context.",
+								"type": "array",
+								"items": {
+									"description": "A path to a context.",
+									"type": "string"
+								}
+							},
+							"context-directory": {
+								"description": "A directory containing contexts.",
+								"type": "object",
+								"properties": {
+									"path": {
+										"description": "A path to a directory containing contexts.",
+										"type": "string"
+									},
+									"extensions": {
+										"description": "A list of file extensions of the contexts.",
+										"type": "array",
+										"items": {
+											"description": "A context file extension.",
+											"type": "string"
+										}
+									}
+								},
+								"required": [ "path" ]
+							}
+						},
+						"allOf": [
+							{
+								"required": [ "template", "destination" ]
+							},
+							{
+								"oneOf": [
+									{
+										"required": [ "contexts" ]
+									},
+									{
+										"required": [ "context-directory" ]
+									},
+									{
+										"required": [ "context" ]
+									}
+								]
+							}
+						],
+						"required": [ "template" ]
+					},
 					"copy-file": {
 						"description": "Copy a file.",
 						"type": "object",
@@ -104,6 +179,32 @@
 							}
 						},
 						"required": [ "source", "destination" ]
+					},
+					"delete-file": {
+						"description": "Delete a file or files.",
+						"type": "object",
+						"properties": {
+							"file": {
+								"description": "The path of the file to delete.",
+								"type": "string"
+							},
+							"files": {
+								"description": "A list of paths of files to delete.",
+								"type": "array",
+								"items": {
+									"description": "The path of the file to delete.",
+									"type": "string"
+								}
+							}
+						},
+						"oneOf": [
+							{
+								"required": [ "file" ]
+							},
+							{
+								"required": [ "files" ]
+							}
+						]
 					}
 				},
 				"oneOf": [
@@ -114,10 +215,16 @@
 						"required": [ "compile-directory" ]
 					},
 					{
+						"required": [ "compile-against" ]
+					},
+					{
 						"required": [ "copy-file" ]
 					},
 					{
 						"required": [ "copy-directory" ]
+					},
+					{
+						"required": [ "delete-file" ]
 					}
 				]
 			},
