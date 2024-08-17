@@ -1,3 +1,16 @@
+## Installation
+
+The _arcana compiler_ can be downloaded with `git` and installed with `cargo`.
+
+```bash
+# download a copy of the repository
+git clone "https://github.com/frankiebaffa/arcana"
+cd arcana
+# install the arcc compiler
+cargo install --path compiler
+arcc -h
+```
+
 ## Glossary
 
 **alias:** A reference to a value within the current _context_ (i.e.
