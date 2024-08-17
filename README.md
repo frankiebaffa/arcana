@@ -351,6 +351,14 @@ ${ alias | path }
 
 Handles the _content_ as a path.
 
+##### Filename
+
+```arcana
+${ alias | path | filename }
+```
+
+Outputs only the filename of the path.
+
 ##### Trim
 
 ```arcana
