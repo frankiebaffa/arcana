@@ -1,0 +1,15 @@
+arcc --compile-directory: Compile all templates in the given directory,
+                          optionally with the matching extensions, and output to
+                          the given directory, optionally with a given
+                          extension. All trailing arguments will be parsed as
+                          --compile-directory arguments until terminated with
+                          the '--' argument or until all arguments have been
+                          consumed.
+
+USAGE
+  arcc -d -s... -d... --
+
+ARGUMENTS
+  -d  --destination  ...  Specification of how to output to the destination
+                          directory.
+  -s  --source       ...  Specification of how to handle the source directory.

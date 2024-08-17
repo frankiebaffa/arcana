@@ -366,7 +366,7 @@ impl Parser {
 
     fn ignore(&mut self) -> Result<bool> {
         if self.src().pos().starts_with(consts::block::IGNORE) {
-            self.until_end(&consts::block::ENDIGNORE, Error::UnterminatedTag(
+            self.until_end(consts::block::ENDIGNORE, Error::UnterminatedTag(
                 "ignore".to_owned(),
                 self.src().coord(),
                 self.src().file().to_owned(),
@@ -707,11 +707,13 @@ impl Parser {
                     self.src().file().to_owned(),
                 ))?;
 
+                const ZERO_THRU_NINE: [char; 10] = [
+                    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+                ];
+
                 let mut split_into = String::new();
                 while !self.src().eof() &&
-                    self.src().pos().starts_with(&[
-                        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
-                    ])
+                    self.src().pos().starts_with(ZERO_THRU_NINE)
                 {
                     split_into.push_str(&self.src_mut().take(1).unwrap());
                 }
@@ -737,9 +739,7 @@ impl Parser {
 
                 let mut split_idx = String::new();
                 while !self.src().eof() &&
-                    self.src().pos().starts_with(&[
-                        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
-                    ])
+                    self.src().pos().starts_with(ZERO_THRU_NINE)
                 {
                     split_idx.push_str(&self.src_mut().take(1).unwrap());
                 }
@@ -897,8 +897,7 @@ impl Parser {
                     IncludeContentMod::Path => value,
                     IncludeContentMod::Filename => {
                         let p = PathBuf::from(value);
-                        p.file_stem().map(|f| f.to_str())
-                            .flatten()
+                        p.file_stem().and_then(|f| f.to_str())
                             .map(|f| f.to_owned())
                             .unwrap_or(String::new())
                     },
@@ -914,13 +913,12 @@ impl Parser {
 
                         let mut start_idx = 0;
                         for i in 0..into {
-                            let end_idx;
-                            if i == into - 1 {
-                                end_idx = l;
+                            let end_idx = if i == into - 1 {
+                                l
                             }
                             else {
-                                end_idx = start_idx + (l / into);
-                            }
+                                start_idx + (l / into)
+                            };
 
                             if i == idx {
                                 start_end = Some((start_idx, end_idx));

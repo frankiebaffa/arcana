@@ -1,0 +1,13 @@
+arcc --copy-directory: Copy files within a directory. All trailing arguments
+                       will be parsed as --copy-directory arguments until
+                       terminated by the '--' argument or until all arguments
+                       have been consumed.
+
+USAGE
+  arcc -r -s <src> -d <dst> [-e <ext>] --
+
+ARGUMENTS
+  -d  --destination  <dst>  The path to the output directory.
+  -e  --extension    <ext>  A file extension to include. Can be specified
+                            multiple times.
+  -s  --source       <src>  The path to the source directory.

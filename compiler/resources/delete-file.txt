@@ -1,0 +1,10 @@
+arcc --delete-file: Delete a file or multiple files. All trailing arguments will
+                    be parsed as --delete-file arguments until terminated by the
+                    '--' argument or until all arguments have been consumed.
+
+USAGE
+  arcc -e -f <pth> --
+
+ARGUMENTS
+  -f  --file  <pth>  The path of the file to delete. Can be included multiple
+                     times.

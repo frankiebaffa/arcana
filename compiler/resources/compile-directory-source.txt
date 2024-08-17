@@ -1,0 +1,15 @@
+arcc --compile-directory --source: Specification of how to handle the source
+                                   directory. All trailing arguments will be
+                                   parsed as --source arguments until terminated
+                                   with the '--' argument or until all arguments
+                                   have been consumed.
+
+USAGE
+  arcc... -s -d <dir> [-e <ext>] --
+
+ARGUMENTS
+  -d  --directory  <dir>  The directory containing arcana templates to
+                          parse.
+  -e  --extension  <ext>  A file extension within <dir> to consider as a
+                          template. Can be included multiple times to specify
+                          multiple file extensions to include.

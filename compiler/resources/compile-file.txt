@@ -1,0 +1,11 @@
+arcc --compile-file: Compile a single template and output to a directory. All
+                     trailing arguments will be parsed as --compile-file
+                     arguments until terminated with the '--' argument or until
+                     all arguments have been consumed.
+
+USAGE
+  arcc -f -s <src> -d <dst> --
+
+ARGUMENTS
+  -d  --destination  <dst>  The path to the output file.
+  -s  --source       <src>  The path to the template file.

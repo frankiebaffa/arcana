@@ -1,0 +1,15 @@
+arcc --compile-against --destination: Specifies the output behavior. All
+                                      trailing arguments will be parsed as
+                                      --destination arguments until terminated
+                                      by the '--' argument or until all
+                                      arguments have been consumed.
+
+USAGE
+  arcc... -d -d <dir> [-e <ext>] --
+
+ARGUMENTS
+  -d  --directory  <dir>  The directory to which to output the compiled
+                          files.
+  -e  --extension  <ext>  The file extension for the compiled files.
+                          Defaults to the original file extension if not
+                          included.

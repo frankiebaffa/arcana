@@ -1,0 +1,14 @@
+arcc --compile-against --context-directory: A directory containing context
+                                            files. All trailing arguments will
+                                            be parsed as --context-directory
+                                            arguments until terminated by the
+                                            '--' argument or until all arguments
+                                            have been consumed.
+
+USAGE
+  arcc... -x -p <pth> [-e <ext>] --
+
+ARGUMENTS
+  -p  --path       <pth>  A path to a directory containing contexts.
+  -e  --extension  <ext>  A file extension within <pth> to consider as a
+                          context file. Can be specified multiple times.
