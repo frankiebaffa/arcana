@@ -472,6 +472,17 @@ fn for_item_2() {
 }
 
 #[test]
+fn for_item_3() {
+    let mut p1 = Parser::new("test/for_item/3/one.arcana").unwrap();
+    p1.parse().unwrap();
+    assert_eq!("First, Second", p1.as_output());
+
+    let mut p2 = Parser::new("test/for_item/3/two.arcana").unwrap();
+    p2.parse().unwrap();
+    assert_eq!("", p2.as_output());
+}
+
+#[test]
 fn full_1() {
     let mut p = Parser::new("test/full/1/page.html").unwrap();
     p.parse().unwrap();
