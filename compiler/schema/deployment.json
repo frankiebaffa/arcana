@@ -120,6 +120,33 @@
 									}
 								},
 								"required": [ "path" ]
+							},
+							"target": {
+								"description": "A nested alias within the context to target.",
+								"type": "array",
+								"items": {
+									"description": "An alias to target.",
+									"type": "object",
+									"properties": {
+										"alias": {
+											"type": "string",
+											"description": "The alias."
+										},
+										"for-each": {
+											"type": "boolean",
+											"description": "Alias is an array and perform the compilation for each element."
+										},
+										"filename-extractor": {
+											"description": "Arcana instructions on how to extract the filename from the context. Should be placed on the final target.",
+											"type": "string"
+										},
+										"alias-to": {
+											"description": "The new alias for the target to be placed at from the root of the current context.",
+											"type": "string"
+										}
+									},
+									"required": [ "alias", "for-each" ]
+								}
 							}
 						},
 						"allOf": [

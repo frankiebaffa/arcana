@@ -28,5 +28,6 @@ pub use {
         Error,
         Result,
     },
+    context::JsonContext,
     parser::Parser,
 };

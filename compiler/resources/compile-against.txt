@@ -4,13 +4,14 @@ arcc --compile-against: Compile a single template against one or multiple
                         '--' argument or until all arguments have been consumed.
 
 USAGE
-  arcc -a -t <tmp> -d... -c <ctx>
-  arcc -a -t <tmp> -d... -x...
+  arcc -a -t <tmp> -d... -c <ctx> [-r...]
+  arcc -a -t <tmp> -d... -x... [-r...]
 
 ARGUMENTS
   -c  --context            <ctx>  A path to a context. Can be included multiple
                                   times.
   -x  --context-directory  ...    A directory containing context files.
   -d  --destination        ...    Specifies the output behavior.
+  -r  --target             ...    A specific alias in context to target.
   -t  --template           <tmp>  The path to the template against which to
                                   compile contexts.

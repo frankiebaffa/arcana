@@ -46,6 +46,17 @@ fn read_file<P: AsRef<Path>>(p: P) -> Result<String> {
 }
 
 pub(crate)
+fn lines_from_string(content: String) -> Vec<String> {
+    let mut lines = content.lines()
+        // put the line breaks back
+        .map(|l| format!("{l}\n"))
+        .collect::<Vec<String>>();
+    // remove the final line break
+    lines.last_mut().unwrap().pop();
+    lines
+}
+
+pub(crate)
 fn read_file_lines<P>(p: P) -> Result<Vec<String>>
 where
     P: AsRef<Path>
@@ -55,13 +66,7 @@ where
         return Ok(Vec::new());
     }
 
-    let mut lines = content.lines()
-        // put the line breaks back
-        .map(|l| format!("{l}\n"))
-        .collect::<Vec<String>>();
-    // remove the final line break
-    lines.last_mut().unwrap().pop();
-    Ok(lines)
+    Ok(lines_from_string(content))
 }
 
 /// The current read-position of a file source.
@@ -104,6 +109,19 @@ impl Default for Source {
 }
 
 impl Source {
+    pub(crate)
+    fn faux_source<P, S>(p: P, content: S) -> Self
+    where
+        P: AsRef<Path>,
+        S: AsRef<str>,
+    {
+        Self {
+            file: p.as_ref().into(),
+            coord: Coordinate::default(),
+            content: lines_from_string(content.as_ref().to_owned()),
+        }
+    }
+
     pub(crate)
     fn read_file<P>(p: P) -> Result<Self>
     where
