@@ -2014,6 +2014,50 @@ impl Parser {
         Ok(true)
     }
 
+    fn set_json(&mut self, bypass: bool) -> Result<bool> {
+        const TAG_NAME: &str = "set-json";
+
+        if !self.src().pos().starts_with(consts::block::SET_JSON) {
+            return Ok(false);
+        }
+
+        fn unexpected_eof(p: &mut Parser, coord: Coordinate) -> Result<()> {
+            p.unexpected_eof(|| Error::UnterminatedTag(
+                TAG_NAME.to_owned(),
+                coord,
+                p.src().file().to_owned(),
+            ))
+        }
+
+        let start = self.src().coord();
+        self.src_mut().take(consts::block::SET_JSON.len());
+        unexpected_eof(self, start)?;
+
+        let output = self.spawn_sealed_internal_parser(|p| {
+            while !p.src().eof() && !p.src().pos().starts_with(consts::block::END_SET_JSON) {
+                p.parse_next(bypass)?;
+            }
+
+            unexpected_eof(p, start)?;
+            p.src_mut().take(consts::block::END_SET_JSON.len());
+            Ok(())
+        })?;
+
+        if !bypass {
+            let s_path = self.path.clone();
+            let new_ctx = JsonContext::read_from_string(&s_path, output, Some(consts::ROOT))?;
+
+            if let Some(ctx) = self.ctx_mut() {
+                ctx.merge(s_path, new_ctx)?;
+            }
+            else {
+                self.context = Some(new_ctx);
+            }
+        }
+
+        Ok(true)
+    }
+
     fn set_item(&mut self, bypass: bool) -> Result<bool> {
         if !self.src().pos().starts_with(consts::block::SET_ITEM) {
             return Ok(false);
@@ -2040,163 +2084,40 @@ impl Parser {
         self.src_mut().trim_start();
         unexpected_eof(self, start)?;
 
-        let mut mods = Vec::new();
-        while self.src().pos().starts_with(consts::block::MODIFIER) {
-            self.src_mut().take(1);
-            self.src_mut().trim_start();
-            unexpected_eof(self, start)?;
-
-            if self.src().pos().starts_with(consts::modif::PATH) {
-                self.src_mut().take(consts::modif::PATH.len());
-                mods.push(SetValueMod::Path);
-            }
-            else if self.src().pos().starts_with(consts::modif::ARRAY) {
-                self.src_mut().take(consts::modif::ARRAY.len());
-                mods.push(SetValueMod::Array);
-            }
-            else {
-                return Err(self.illegal_character(TAG_NAME));
-            }
-
-            self.src_mut().trim_start();
-        }
-
-        unexpected_eof(self, start)?;
-
         if !self.src().pos().starts_with(consts::block::ENDBLOCK) {
             return Err(self.illegal_character(TAG_NAME));
         }
-
-        let is_arr = mods.iter().any(|v| v.eq(&SetValueMod::Array));
-        let is_path = mods.iter().any(|v| v.eq(&SetValueMod::Path));
 
         self.src_mut().take(1);
 
         unexpected_eof(self, start)?;
 
         if !self.src().pos().starts_with(consts::block::CHAIN) &&
-            !self.src().pos().starts_with(consts::block::STARTBLOCK) &&
-            !self.src().pos().starts_with(consts::block::SIPHON)
+            !self.src().pos().starts_with(consts::block::STARTBLOCK)
         {
             return Err(self.illegal_character(TAG_NAME));
         }
 
-        // if we are siphoning, clone the value from the siphon's alias to the
-        // previously defined alias
-        if self.src().pos().starts_with(consts::block::SIPHON) {
-            self.src_mut().take(consts::block::SIPHON.len());
-            self.src_mut().trim_start();
-            unexpected_eof(self, start)?;
-
-            let clone_from = self.alias(TAG_NAME)?;
-            self.src_mut().trim_start();
-            unexpected_eof(self, start)?;
-            if !self.src().pos().starts_with(consts::block::ENDBLOCK) {
-                return Err(self.illegal_character(TAG_NAME));
-            }
-            self.src_mut().take(1);
-
-            if alias.eq(consts::ROOT) && !bypass {
-                match self.get_value(&clone_from)?.to_owned() {
-                    JsonValue::Object(obj) => {
-                        for (k, v) in obj.into_iter() {
-                            self.set_json_value(k, v.to_owned())?;
-                        }
-                    },
-                    _ => {
-                        return Err(Error::ValueNotObject(clone_from.into()));
-                    },
-                }
-            }
-            else {
-                self.clone_value(clone_from, alias)?;
-            }
-
-            return Ok(true);
-        }
-
-        while !self.src().eof() &&
-            (
-                self.src().pos().starts_with(consts::block::CHAIN) ||
-                self.src().pos().starts_with(consts::block::STARTBLOCK)
-            )
-        {
-            self.chain_start(TAG_NAME, start)?;
-
-            let output = self.spawn_sealed_internal_parser(|p| {
-                while !p.src().eof() && !p.src().pos().starts_with(consts::block::ENDBLOCK) {
-                    p.parse_next(bypass)?;
-                }
-
-                unexpected_eof(p, start)?;
-
-                p.src_mut().take(1);
-
-                Ok(())
-            })?;
-
-            if is_arr {
-                if is_path {
-                    self.push_pathlike(alias.clone(), output, self.src().file().clone())?;
-                }
-                else {
-                    self.push_stringlike(alias.clone(), output)?;
-                }
-            }
-            else {
-                if is_path {
-                    self.set_path(self.src().file().clone(), alias.clone(), output)?;
-                }
-                else {
-                    self.set_value(alias.clone(), output)?;
-                }
-                break;
-            }
-        }
-
-        Ok(true)
-    }
-
-    fn set_json(&mut self, bypass: bool) -> Result<bool> {
-        if !self.src().pos().starts_with(consts::block::SET_JSON) {
-            return Ok(false);
-        }
-
-        const TAG_NAME: &str = "set-json";
-
-        self.src_mut().take(consts::block::SET_JSON.len());
-
-        fn unexpected_eof(p: &mut Parser, coord: Coordinate) -> Result<()> {
-            p.unexpected_eof(|| Error::UnterminatedTag(
-                TAG_NAME.to_owned(),
-                coord,
-                p.src().file().to_owned(),
-            ))
-        }
-
-        let start = self.src().coord();
-        unexpected_eof(self, start)?;
+        self.chain_start(TAG_NAME, start)?;
 
         let output = self.spawn_sealed_internal_parser(|p| {
-            while !p.src().eof() && !p.src().pos().starts_with(consts::block::END_SET_JSON) {
+            while !p.src().eof() && !p.src().pos().starts_with(consts::block::END_SET_ITEM) {
                 p.parse_next(bypass)?;
             }
 
             unexpected_eof(p, start)?;
-            p.src_mut().take(consts::block::END_SET_JSON.len());
+            p.src_mut().take(consts::block::END_SET_ITEM.len());
             Ok(())
         })?;
 
         if !bypass {
             let s_path = self.path.clone();
-            let new_ctx = JsonContext::read_from_string(&s_path, output, Some(consts::ROOT))?;
 
-            if let Some(ctx) = self.ctx_mut() {
-                ctx.merge(s_path, new_ctx)?;
+            if self.ctx().is_none() {
+                self.context = Some(JsonContext::faux_context(&self.path)?);
             }
-            else {
-                self.context = Some(new_ctx);
-            }
+
+            self.enforce_context(|ctx| Ok(ctx.set_value(alias, JsonContext::parse_json(&s_path, output)?)?))?;
         }
 
         Ok(true)
@@ -2279,8 +2200,15 @@ impl Parser {
     }
 
     fn parse_next(&mut self, bypass: bool) -> Result<()> {
+        // is escaped (3 char pattern)
+        if self.src().pos().starts_with(consts::block::esc::SET_JSON)
+        {
+            self.src_mut().take(consts::block::esc::ESCAPE.len());
+            let taken = self.src_mut().take(3).unwrap();
+            self.output.push_str(&taken);
+        }
         // is escaped (2 char pattern)
-        if self.src().pos().starts_with(consts::block::esc::MODIFIER) ||
+        else if self.src().pos().starts_with(consts::block::esc::MODIFIER) ||
             self.src().pos().starts_with(consts::block::esc::IGNORE) ||
             self.src().pos().starts_with(consts::block::esc::COMMENT) ||
             self.src().pos().starts_with(consts::block::esc::EXTENDS) ||
@@ -2289,8 +2217,7 @@ impl Parser {
             self.src().pos().starts_with(consts::block::esc::INCLUDE_CONTENT) ||
             self.src().pos().starts_with(consts::block::esc::EXPRESSION) ||
             self.src().pos().starts_with(consts::block::esc::SET_ITEM) ||
-            self.src().pos().starts_with(consts::block::esc::UNSET_ITEM) ||
-            self.src().pos().starts_with(consts::block::esc::SET_JSON)
+            self.src().pos().starts_with(consts::block::esc::UNSET_ITEM)
         {
             self.src_mut().take(consts::block::esc::ESCAPE.len());
             let taken = self.src_mut().take(2).unwrap();
@@ -2320,12 +2247,12 @@ impl Parser {
             self.for_file(bypass)? ||
             // is for-item
             self.for_item(bypass)? ||
+            // is set-json
+            self.set_json(bypass)? ||
             // is set-item
             self.set_item(bypass)? ||
             // is remove-item
-            self.unset_item()? ||
-            // is set-json
-            self.set_json(bypass)?
+            self.unset_item()?
         {
             // no action required
         }

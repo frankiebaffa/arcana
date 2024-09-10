@@ -1,2 +1,2 @@
-.{"ctx.json"}>{{"value": "${obj.value}"}}<${value}
+.{"ctx.json"}={{{"value": "${obj.value}"}}}=${value}
 ${obj.value}

@@ -1,5 +1,5 @@
 %{the-item}{
-		={$root}<{the-item}${name}
+		={{${the-item|json}}}=${name}
 }{
 	No name.
 }

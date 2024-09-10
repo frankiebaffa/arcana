@@ -150,11 +150,16 @@ impl JsonContext {
     }
 
     pub(crate)
+    fn parse_json<P: AsRef<Path>, S: AsRef<str>>(path: P, source: S) -> Result<JsonValue> {
+        let p: PathBuf = path.as_ref().into();
+        from_json_str::<JsonValue>(source.as_ref()).map_err(|e| Error::JsonParse(e, p))
+    }
+
+    pub(crate)
     fn read_from_string<P: AsRef<Path>, S: AsRef<str>, A: Into<Alias>>(path: P, source: S, alias: Option<A>) -> Result<Self> {
         let p: PathBuf = path.as_ref().into();
 
-        let mut properties = from_json_str::<JsonValue>(source.as_ref())
-            .map_err(|e| Error::JsonParse(e, p.clone()))?;
+        let mut properties = Self::parse_json(path, source)?;
 
         if !matches!(properties, JsonValue::Object(_)) {
             return Err(Error::NotAMap(p));
@@ -347,6 +352,40 @@ impl JsonContext {
             else {
                 value.as_object_mut().unwrap()
                     .insert(seg.segment.to_owned(), val);
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub(crate)
+    fn set_context_at<A>(&mut self, alias: A, val: Self) -> Result<()>
+    where
+        A: Into<Alias>
+    {
+        let a: Alias =  alias.into();
+
+        let mut value = &mut self.properties;
+        let len = a.scope.len();
+        for (idx, seg) in a.iter().enumerate() {
+            // not the last iteration, make sure the segment is an object
+            if idx != len - 1 {
+                // if the value is not an object
+                if !matches!(value.get(&seg.segment), Some(JsonValue::Object(_))) {
+                    value.as_object_mut().unwrap()
+                        .insert(
+                            seg.segment.to_owned(),
+                            JsonValue::Object(JsonMap::new())
+                        );
+                }
+
+                value = value.get_mut(&seg.segment).unwrap();
+            }
+            // last iteration, set the path value
+            else {
+                value.as_object_mut().unwrap()
+                    .insert(seg.segment.to_owned(), val.properties);
                 break;
             }
         }

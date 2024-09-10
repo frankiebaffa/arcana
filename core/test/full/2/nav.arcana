@@ -1,7 +1,7 @@
-%{nav}{@{item in nav}{/{children}={$root}<{item}<div class="toc">
+%{nav}{@{item in nav}{/{children}={{${item|json}}}=<div class="toc">
 	%{href}{<a href="${href}">${text}</a>}{<p>${text}</p>}
 	%{children}{
-		={nav}<{children}
+		={nav}{${children|json}}=
 		&{"./nav.arcana"}
 	}
 </div>}}

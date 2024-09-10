@@ -43,10 +43,10 @@ pub(crate)
 const EXPRESSION: &str = "\\%{";
 
 pub(crate)
-const SET_JSON: &str = "\\>{";
+const SET_ITEM: &str = "\\={";
 
 pub(crate)
-const SET_ITEM: &str = "\\={";
+const SET_JSON: &str = "\\={{";
 
 pub(crate)
 const UNSET_ITEM: &str = "\\/{";

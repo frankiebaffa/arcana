@@ -1,7 +1,8 @@
-={ obj.arr | array }-
-{First}-
-{Second}-
-{Third}-
-{Fourth}@{ item in obj.arr }-
+={obj.arr}{[
+	"First",
+	"Second",
+	"Third",
+	"Fourth"
+]}=@{ item in obj.arr }-
 {%{ !$loop.first }{
 }${ item }}

@@ -1,4 +1,4 @@
->{{
+={{{
 	"obj": {
 		"arr": [
 			"First",
@@ -7,5 +7,5 @@
 			"Fourth"
 		]
 	}
-}}<@{item in obj.arr}{%{!$loop.first}{
+}}}=@{item in obj.arr}{%{!$loop.first}{
 }${item}}
