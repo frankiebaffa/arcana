@@ -1,2 +1,2 @@
-+{ "parent_template.arcana" }%{ $content }{
-${ $content }}
++{ "parent_template.arcana" }%{ $content }(
+${ $content })

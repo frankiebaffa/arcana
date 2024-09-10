@@ -1,0 +1,9 @@
+={}({
+	"object": {
+		"inner": {
+			"name": "The Name"
+		}
+	}
+})={}({
+	"object": ${object.inner}
+})${object.name}

@@ -1,0 +1,4 @@
+={}({
+	"name": "First",
+	"age": 31
+})${name}: ${age}

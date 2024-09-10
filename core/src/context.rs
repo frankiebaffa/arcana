@@ -66,11 +66,16 @@ impl<S: AsRef<str>> From<S> for Alias {
     fn from(input: S) -> Self {
         let i = input.as_ref();
 
-        Self {
-            scope: i.split(SCOPESEP)
-                .map(|seg| seg.to_owned())
-                .collect::<Vec<String>>(),
+        let scope = if i == crate::parser::consts::ROOT {
+            vec![]
         }
+        else {
+            i.split(SCOPESEP)
+                .map(|seg| seg.to_owned())
+                .collect::<Vec<String>>()
+        };
+
+        Self { scope, }
     }
 }
 
@@ -144,20 +149,17 @@ impl JsonContext {
         })
     }
 
-    fn read_internal<P: AsRef<Path>, A: Into<Alias>>(p: P, alias: Option<A>) -> Result<Self> {
-        let p = clean_path(p);
+    pub(crate)
+    fn parse_json<P: AsRef<Path>, S: AsRef<str>>(path: P, source: S) -> Result<JsonValue> {
+        let p: PathBuf = path.as_ref().into();
+        from_json_str::<JsonValue>(source.as_ref()).map_err(|e| Error::JsonParse(e, p))
+    }
 
-        if p.is_relative() {
-            return Err(Error::IllegalRelativePath(p));
-        }
-        else if p.is_dir() {
-            return Err(Error::IllegalDirPath(p));
-        }
+    pub(crate)
+    fn read_from_string<P: AsRef<Path>, S: AsRef<str>, A: Into<Alias>>(path: P, source: S, alias: Option<A>) -> Result<Self> {
+        let p: PathBuf = path.as_ref().into();
 
-        let file = read_file(&p)?;
-
-        let mut properties = from_json_str::<JsonValue>(&file)
-            .map_err(|e| Error::JsonParse(e, p.clone()))?;
+        let mut properties = Self::parse_json(path, source)?;
 
         if !matches!(properties, JsonValue::Object(_)) {
             return Err(Error::NotAMap(p));
@@ -187,23 +189,36 @@ impl JsonContext {
         })
     }
 
+    fn read_internal<P: AsRef<Path>, A: Into<Alias>>(p: P, alias: Option<A>) -> Result<Self> {
+        let p = clean_path(p);
+
+        if p.is_relative() {
+            return Err(Error::IllegalRelativePath(p));
+        }
+        else if p.is_dir() {
+            return Err(Error::IllegalDirPath(p));
+        }
+
+        let file = read_file(&p)?;
+
+        Self::read_from_string(p, file, alias)
+    }
+
     pub
     fn read<P: AsRef<Path>>(p: P) -> Result<Self> {
         Self::read_internal::<P, Alias>(p, None)
     }
 
-    fn read_in_internal<P, A>(&mut self, path: P, alias: Option<A>) -> Result<()>
+    pub(crate)
+    fn merge<P>(&mut self, source_path: P, ctx: JsonContext) -> Result<()>
     where
-        P: AsRef<Path>,
-        A: Into<Alias>
+        P: AsRef<Path>
     {
-        let ctx = Self::read_internal(path.as_ref(), alias)?;
-
         let ctx_map = if let JsonValue::Object(map) = ctx.properties {
             map
         }
         else {
-            return Err(Error::NotAMap(path.as_ref().into()));
+            return Err(Error::NotAMap(source_path.as_ref().into()));
         };
 
         let path_to_scope = if let Some(path) = ctx.scoped_paths.get(&Alias::default()) {
@@ -219,6 +234,16 @@ impl JsonContext {
         }
 
         Ok(())
+    }
+
+    fn read_in_internal<P, A>(&mut self, path: P, alias: Option<A>) -> Result<()>
+    where
+        P: AsRef<Path>,
+        A: Into<Alias>
+    {
+        let ctx = Self::read_internal(path.as_ref(), alias)?;
+
+        self.merge(path, ctx)
     }
 
     pub(crate)
@@ -265,42 +290,6 @@ impl JsonContext {
     }
 
     pub(crate)
-    fn set_stringlike<A, S>(&mut self, alias: A, val: S) -> Result<()>
-    where
-        A: Into<Alias>,
-        S: AsRef<str>
-    {
-        let a: Alias =  alias.into();
-        let val = val.as_ref().to_owned();
-
-        let mut value = &mut self.properties;
-        let len = a.scope.len();
-        for (idx, seg) in a.iter().enumerate() {
-            // not the last iteration, make sure the segment is an object
-            if idx != len - 1 {
-                // if the value is not an object
-                if !matches!(value.get(&seg.segment), Some(JsonValue::Object(_))) {
-                    value.as_object_mut().unwrap()
-                        .insert(
-                            seg.segment.to_owned(),
-                            JsonValue::Object(JsonMap::new())
-                        );
-                }
-
-                value = value.get_mut(&seg.segment).unwrap();
-            }
-            // last iteration, set the path value
-            else {
-                value.as_object_mut().unwrap()
-                    .insert(seg.segment.to_owned(), JsonValue::String(val));
-                break;
-            }
-        }
-
-        Ok(())
-    }
-
-    pub(crate)
     fn set_value<A>(&mut self, alias: A, val: JsonValue) -> Result<()>
     where
         A: Into<Alias>
@@ -330,171 +319,6 @@ impl JsonContext {
                 break;
             }
         }
-
-        Ok(())
-    }
-
-    fn push_stringlike_internal<A, S, P>(&mut self, alias: A, val: S, path: Option<P>) -> Result<()>
-    where
-        A: Into<Alias>,
-        S: AsRef<str>,
-        P: AsRef<Path>
-    {
-        let p = path
-            .map(|p| {
-                let mut p: PathBuf = p.as_ref().into();
-
-                if p.is_dir() {
-                    return Err(Error::IllegalDirPath(p));
-                }
-
-                p.pop();
-                Ok(Some(p))
-            })
-            .unwrap_or(Ok(None))?;
-
-        let a: Alias =  alias.into();
-
-        let mut value = &mut self.properties;
-        let len = a.scope.len();
-        for (idx, seg) in a.iter().enumerate() {
-            // not the last iteration, make sure the segment is an object
-            if idx != len - 1 {
-                // if the value is not an object
-                if !matches!(value.get(&seg.segment), Some(JsonValue::Object(_))) {
-                    value.as_object_mut().unwrap()
-                        .insert(
-                            seg.segment.to_owned(),
-                            JsonValue::Object(JsonMap::new())
-                        );
-                }
-
-                value = value.get_mut(&seg.segment).unwrap();
-            }
-            // last iteration, set the path value
-            else {
-                if !matches!(value.get(&seg.segment), Some(JsonValue::Array(_))) {
-                    value.as_object_mut().unwrap().insert(
-                        seg.segment.to_owned(),
-                        JsonValue::Array(vec![])
-                    );
-                }
-
-                value.as_object_mut().unwrap().get_mut(&seg.segment).unwrap()
-                    .as_array_mut()
-                    .unwrap()
-                    .push(JsonValue::String(val.as_ref().to_owned()));
-
-                break;
-            }
-        }
-
-        if let Some(p) = p {
-            self.scoped_paths.insert(a, p);
-        }
-
-        Ok(())
-    }
-
-    pub(crate)
-    fn push_stringlike<A, V>(&mut self, alias: A, value: V) -> Result<()>
-    where
-        A: Into<Alias>,
-        V: AsRef<str>,
-    {
-        self.push_stringlike_internal::<A, V, PathBuf>(alias, value, None)
-    }
-
-    pub(crate)
-    fn push_pathlike<A, V, P>(&mut self, alias: A, value: V, path: P) -> Result<()>
-    where
-        A: Into<Alias>,
-        V: AsRef<str>,
-        P: AsRef<Path>
-    {
-        self.push_stringlike_internal(alias, value, Some(path))
-    }
-
-    pub(crate)
-    fn pop_stringlike<A>(&mut self, alias: A) -> Result<()>
-    where
-        A: Into<Alias>
-    {
-        let a: Alias =  alias.into();
-
-        let mut value = &mut self.properties;
-        let len = a.scope.len();
-        for (idx, seg) in a.iter().enumerate() {
-            // not the last iteration, make sure the segment is an object
-            if idx != len - 1 {
-                // if the value is not an object
-                if !matches!(value.get(&seg.segment), Some(JsonValue::Object(_))) {
-                    return Ok(());
-                }
-
-                value = value.get_mut(&seg.segment).unwrap();
-            }
-            // last iteration, pop the value
-            else {
-                if !matches!(value.get(&seg.segment), Some(JsonValue::Array(_))) {
-                    return Ok(());
-                }
-
-                value.get_mut(&seg.segment).unwrap().as_array_mut()
-                    .unwrap()
-                    .pop();
-
-                break;
-            }
-        }
-
-        Ok(())
-    }
-
-    pub(crate)
-    fn set_path<A, P, V>(&mut self, path: P, alias: A, value: V) -> Result<()>
-    where
-        A: Into<Alias>,
-        P: AsRef<Path>,
-        V: AsRef<str>
-    {
-        let mut p: PathBuf = path.as_ref().into();
-
-        if p.is_dir() {
-            return Err(Error::IllegalDirPath(p));
-        }
-
-        p.pop();
-
-        let a: Alias =  alias.into();
-
-        let mut v = &mut self.properties;
-        let len = a.scope.len();
-        for (idx, seg) in a.iter().enumerate() {
-            // not the last iteration, make sure the segment is an object
-            if idx != len - 1 {
-                // if the value is not an object
-                if !matches!(v.get(&seg.segment), Some(JsonValue::Object(_))) {
-                    v.as_object_mut().unwrap()
-                        .insert(
-                            seg.segment.to_owned(),
-                            JsonValue::Object(JsonMap::new())
-                        );
-                }
-
-                v = v.get_mut(&seg.segment).unwrap();
-            }
-            // last iteration, set the path value
-            else {
-                v.as_object_mut().unwrap().insert(
-                    seg.segment.to_owned(),
-                    JsonValue::String(value.as_ref().to_owned())
-                );
-                break;
-            }
-        }
-
-        self.scoped_paths.insert(a, p);
 
         Ok(())
     }
@@ -564,18 +388,17 @@ impl JsonContext {
             if let JsonValue::Array(a) = value {
                 let inner: Alias = inner_alias.into();
 
-                return Ok(a.clone().into_iter()
+                return a.clone().into_iter()
                     .map(|v| {
                         let mut new = self.clone();
                         new.set_value(inner.clone(), v)?;
                         new.scoped_paths.insert(inner.clone(), path.clone());
                         Ok(new)
                     })
-                    .collect::<Result<Vec<Self>>>()?
-                );
+                    .collect::<Result<Vec<Self>>>();
             }
             else {
-                return Err(Error::ValueNotArray(alias.into()));
+                return Err(Error::ValueNotArray(alias));
             }
         }
 
@@ -594,7 +417,7 @@ impl JsonContext {
             )
         }
         else {
-            Err(Error::ValueNotArray(alias.into()))
+            Err(Error::ValueNotArray(alias))
         }
     }
 
@@ -640,17 +463,10 @@ impl JsonContext {
         let a = alias.into();
         let val = self.get_internal(a.clone())?.0;
 
-        if let Some(s) = val.as_str() {
-            Ok(Some(s.to_owned()))
-        }
-        else if let Some(i) = val.as_number() {
-            Ok(Some(i.to_string()))
-        }
-        else if !val.is_null() {
-            Err(Error::ValueNotString(a))
-        }
-        else {
-            Ok(None)
+        match val {
+            JsonValue::String(s) => Ok(Some(s.to_owned())),
+            JsonValue::Null => Ok(None),
+            v => Ok(Some(v.to_string())),
         }
     }
 
@@ -753,6 +569,126 @@ impl JsonContext {
         match self.get(alias)? {
             JsonValue::Null => Ok(false),
             _ => Ok(true),
+        }
+    }
+
+    pub(crate)
+    fn truthy<A: Into<Alias>>(&self, alias: A) -> Result<bool> {
+        match self.get(alias)? {
+            JsonValue::Null => Ok(false),
+            JsonValue::Bool(b) => Ok(*b),
+            JsonValue::Number(n) => if n.is_i64() {
+                Ok(n.as_i64().unwrap() > 0)
+            }
+            else if n.is_u64() {
+                Ok(n.as_u64().unwrap() > 0)
+            }
+            else {
+                Ok(n.as_f64().unwrap() > 0_f64)
+            }
+            JsonValue::String(_)|JsonValue::Object(_)|JsonValue::Array(_) => Ok(true),
+        }
+    }
+
+    pub(crate)
+    fn eq<A: Into<Alias>, B: Into<Alias>>(&self, a: A, b: B) -> Result<bool> {
+        Ok(self.get(a)?.eq(self.get(b)?))
+    }
+
+    pub(crate)
+    fn ne<A: Into<Alias>, B: Into<Alias>>(&self, a: A, b: B) -> Result<bool> {
+        Ok(self.get(a)?.ne(self.get(b)?))
+    }
+
+    pub(crate)
+    fn gt<A: Into<Alias>, B: Into<Alias>>(&self, a: A, b: B) -> Result<bool> {
+        let a: Alias = a.into();
+        let b: Alias = b.into();
+        let a_val = self.get(a.clone())?;
+        let b_val = self.get(b.clone())?;
+
+        match (a_val, b_val) {
+            (JsonValue::String(a), JsonValue::String(b)) => Ok(a.gt(b)),
+            (JsonValue::Number(a), JsonValue::Number(b)) => if a.is_i64() && b.is_i64() {
+                Ok(a.as_i64().unwrap().gt(&b.as_i64().unwrap()))
+            }
+            else if a.is_u64() && b.is_u64() {
+                Ok(a.as_u64().unwrap().gt(&b.as_u64().unwrap()))
+            }
+            else {
+                Ok(a.as_f64().unwrap().gt(&b.as_f64().unwrap()))
+            },
+            (JsonValue::Bool(a), JsonValue::Bool(b)) => Ok(a.gt(b)),
+            _ => Err(Error::CannotCompare(a, b)),
+        }
+    }
+
+    pub(crate)
+    fn ge<A: Into<Alias>, B: Into<Alias>>(&self, a: A, b: B) -> Result<bool> {
+        let a: Alias = a.into();
+        let b: Alias = b.into();
+        let a_val = self.get(a.clone())?;
+        let b_val = self.get(b.clone())?;
+
+        match (a_val, b_val) {
+            (JsonValue::String(a), JsonValue::String(b)) => Ok(a.ge(b)),
+            (JsonValue::Number(a), JsonValue::Number(b)) => if a.is_i64() && b.is_i64() {
+                Ok(a.as_i64().unwrap().ge(&b.as_i64().unwrap()))
+            }
+            else if a.is_u64() && b.is_u64() {
+                Ok(a.as_u64().unwrap().ge(&b.as_u64().unwrap()))
+            }
+            else {
+                Ok(a.as_f64().unwrap().ge(&b.as_f64().unwrap()))
+            },
+            (JsonValue::Bool(a), JsonValue::Bool(b)) => Ok(a.ge(b)),
+            _ => Err(Error::CannotCompare(a, b)),
+        }
+    }
+
+    pub(crate)
+    fn lt<A: Into<Alias>, B: Into<Alias>>(&self, a: A, b: B) -> Result<bool> {
+        let a: Alias = a.into();
+        let b: Alias = b.into();
+        let a_val = self.get(a.clone())?;
+        let b_val = self.get(b.clone())?;
+
+        match (a_val, b_val) {
+            (JsonValue::String(a), JsonValue::String(b)) => Ok(a.lt(b)),
+            (JsonValue::Number(a), JsonValue::Number(b)) => if a.is_i64() && b.is_i64() {
+                Ok(a.as_i64().unwrap().lt(&b.as_i64().unwrap()))
+            }
+            else if a.is_u64() && b.is_u64() {
+                Ok(a.as_u64().unwrap().lt(&b.as_u64().unwrap()))
+            }
+            else {
+                Ok(a.as_f64().unwrap().lt(&b.as_f64().unwrap()))
+            },
+            (JsonValue::Bool(a), JsonValue::Bool(b)) => Ok(a.lt(b)),
+            _ => Err(Error::CannotCompare(a, b)),
+        }
+    }
+
+    pub(crate)
+    fn le<A: Into<Alias>, B: Into<Alias>>(&self, a: A, b: B) -> Result<bool> {
+        let a: Alias = a.into();
+        let b: Alias = b.into();
+        let a_val = self.get(a.clone())?;
+        let b_val = self.get(b.clone())?;
+
+        match (a_val, b_val) {
+            (JsonValue::String(a), JsonValue::String(b)) => Ok(a.le(b)),
+            (JsonValue::Number(a), JsonValue::Number(b)) => if a.is_i64() && b.is_i64() {
+                Ok(a.as_i64().unwrap().le(&b.as_i64().unwrap()))
+            }
+            else if a.is_u64() && b.is_u64() {
+                Ok(a.as_u64().unwrap().le(&b.as_u64().unwrap()))
+            }
+            else {
+                Ok(a.as_f64().unwrap().le(&b.as_f64().unwrap()))
+            },
+            (JsonValue::Bool(a), JsonValue::Bool(b)) => Ok(a.le(b)),
+            _ => Err(Error::CannotCompare(a, b)),
         }
     }
 }

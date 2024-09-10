@@ -1,2 +1,4 @@
-.{"ctx.json"}={$root}<{obj}${value}
+.{"ctx.json"}={}(
+	${obj|json}
+)${value}
 ${obj.value}

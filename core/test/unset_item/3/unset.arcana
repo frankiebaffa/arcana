@@ -1,6 +1,7 @@
-={ obj.array | array }-
-{First}-
-{Second}-
-{Third}/{ obj.array }@{ item? in obj.array }-
-{%{ !$loop.first}{
-}${ item }}
+={ obj.array }([
+	"First",
+	"Second",
+	"Third"
+])/{ obj.array }@{ item in obj.array? }-
+(%{ !$loop.first}(
+)${ item })

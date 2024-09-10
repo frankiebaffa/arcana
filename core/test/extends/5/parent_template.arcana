@@ -1,1 +1,1 @@
-${ name }%{ $content }{${ $content }}
+${ name }%{ $content }(${ $content })

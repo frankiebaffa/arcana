@@ -28,3 +28,27 @@ const EXISTS: &str = "exists";
 
 pub(crate)
 const EMPTY: &str = "empty";
+
+pub(crate)
+const EQ: &str = "==";
+
+pub(crate)
+const NE: &str = "!=";
+
+pub(crate)
+const GT: char = '>';
+
+pub(crate)
+const GE: &str = ">=";
+
+pub(crate)
+const LT: char = '<';
+
+pub(crate)
+const LE: &str = "<=";
+
+pub(crate)
+const AND: &str = "&&";
+
+pub(crate)
+const OR: &str = "||";

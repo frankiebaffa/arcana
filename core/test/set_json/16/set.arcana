@@ -1,0 +1,9 @@
+={}({
+	"item": {
+		"first": "First"
+	}
+})
+={item.second}("Second")
+={}(${item|json})
+${first}
+${second}

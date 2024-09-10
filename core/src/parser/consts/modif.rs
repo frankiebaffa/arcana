@@ -45,16 +45,13 @@ pub(crate)
 const PATHS: &str = "paths";
 
 pub(crate)
-const ARRAY: &str = "array";
-
-pub(crate)
 const PATH: &str = "path";
-
-pub(crate)
-const POP: &str = "pop";
 
 pub(crate)
 const TRIM: &str = "trim";
 
 pub(crate)
 const SPLIT: &str = "split";
+
+pub(crate)
+const JSON: &str = "json";

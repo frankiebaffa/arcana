@@ -1,0 +1,7 @@
+={}({
+	"first-name": "First"
+})={}({
+	"item": {
+		"name": "${first-name}"
+	}
+})${item.name}

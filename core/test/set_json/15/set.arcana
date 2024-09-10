@@ -1,0 +1,5 @@
+%{the-item}(
+	={}(${the-item})${name}
+)(
+	No name.
+)

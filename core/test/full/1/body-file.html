@@ -1,4 +1,4 @@
 		<ul>
-*{ item in "items" | ext "html" }{%{ !$loop.first }{
-}			<li>&{ item }</li>}{<li>No items.</li>}
+*{ item in "items" | ext "html" }(%{ !$loop.first }(
+)			<li>&{ item }</li>)(<li>No items.</li>)
 		</ul>

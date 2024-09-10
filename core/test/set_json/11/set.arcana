@@ -1,0 +1,10 @@
+={}({
+	"obj": {
+		"paths": [
+			"path/to/file.txt",
+			"../../different/file.txt",
+			"/absolute/path.txt"
+		]
+	}
+})@{path in obj.paths}(%{!$loop.first}(
+)${path|path})

@@ -59,6 +59,7 @@ pub enum Error {
     ValueNotObject(Alias),
     ContextEmpty(Coordinate, PathBuf),
     IllegalSplit(usize, usize, Coordinate, PathBuf),
+    CannotCompare(Alias, Alias),
 }
 
 impl Display for Error {
@@ -172,6 +173,9 @@ impl Display for Error {
                 f,
                 c.line() + 1,
                 c.position() + 1
+            )),
+            Self::CannotCompare(a, b) => fmtr.write_fmt(format_args!(
+                "Cannot compare non-similar data-type {a} to {b}"
             )),
         }
     }
