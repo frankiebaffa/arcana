@@ -120,7 +120,8 @@ impl Display for Alias {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct JsonContext {
+pub
+struct JsonContext {
     properties: JsonValue,
     scoped_paths: HashMap<Alias, PathBuf>,
 }
@@ -198,7 +199,7 @@ impl JsonContext {
         Self::read_from_string(p, file, alias)
     }
 
-    pub(crate)
+    pub
     fn read<P: AsRef<Path>>(p: P) -> Result<Self> {
         Self::read_internal::<P, Alias>(p, None)
     }
@@ -542,6 +543,78 @@ impl JsonContext {
         }
         else {
             Err(Error::NoScopedPath(a))
+        }
+    }
+
+    pub
+    fn get_as_context<A, A2>(&self, alias: A, inner_alias: Option<A2>) -> Result<Self>
+    where
+        A: Into<Alias>,
+        A2: Into<Alias>,
+    {
+        let (value, path) = self.get_internal(alias)?;
+
+        if let Some(inner_alias) = inner_alias {
+            let mut new = self.clone();
+            let inner = inner_alias.into();
+            new.set_value(inner.clone(), value.clone())?;
+            new.scoped_paths.insert(inner.clone(), path);
+            return Ok(new);
+        }
+
+        let mut scoped_paths = HashMap::new();
+        scoped_paths.insert(Alias::default(), path);
+
+        Ok(Self {
+            properties: value.clone(),
+            scoped_paths,
+        })
+    }
+
+    pub
+    fn get_each_as_context<A, A2>(&self, alias: A, inner_alias: Option<A2>) -> Result<Vec<Self>>
+    where
+        A: Into<Alias>,
+        A2: Into<Alias>,
+    {
+        let alias: Alias = alias.into();
+        let (value, path) = self.get_internal(alias.clone())?;
+
+        if let Some(inner_alias) = inner_alias {
+            if let JsonValue::Array(a) = value {
+                let inner: Alias = inner_alias.into();
+
+                return Ok(a.clone().into_iter()
+                    .map(|v| {
+                        let mut new = self.clone();
+                        new.set_value(inner.clone(), v)?;
+                        new.scoped_paths.insert(inner.clone(), path.clone());
+                        Ok(new)
+                    })
+                    .collect::<Result<Vec<Self>>>()?
+                );
+            }
+            else {
+                return Err(Error::ValueNotArray(alias.into()));
+            }
+        }
+
+        if let JsonValue::Array(a) = value {
+            Ok(a.clone().into_iter()
+                .map(|v| {
+                    let mut scoped_paths = HashMap::new();
+                    scoped_paths.insert(Alias::default(), path.clone());
+
+                    Self {
+                        properties: v,
+                        scoped_paths,
+                    }
+                })
+                .collect::<Vec<Self>>()
+            )
+        }
+        else {
+            Err(Error::ValueNotArray(alias.into()))
         }
     }
 

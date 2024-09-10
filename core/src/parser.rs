@@ -103,18 +103,24 @@ struct Parser {
 }
 
 impl Parser {
-    fn new_internal<P>(path: P, ctx: Option<JsonContext>) -> Result<Self>
+    fn new_internal<P>(path: P, content: Option<String>, ctx: Option<JsonContext>) -> Result<Self>
     where
-        P: AsRef<Path>
+        P: AsRef<Path>,
     {
         let abs_path = Self::normalize_initial_path(path)?;
+        let source = if let Some(c) = content {
+            Source::faux_source(&abs_path, c)
+        }
+        else {
+            Source::read_file(&abs_path)?
+        };
 
         Ok(Self {
-            path: abs_path.clone(),
+            path: abs_path,
             context: ctx,
             extends: None,
             can_extend: true,
-            source: Source::read_file(abs_path)?,
+            source,
             output: String::new(),
         })
     }
@@ -127,7 +133,7 @@ impl Parser {
         // take context from this parser
         let ctx = std::mem::take(&mut self.context);
         // initialize new parser at path with context and parse
-        let mut scoped_parser = Self::new_internal(p, ctx)?;
+        let mut scoped_parser = Self::new_internal(p, None, ctx)?;
         f(&mut scoped_parser)?;
         // deconstruct new parser into context and output
         let Parser { mut context, output, .. } = scoped_parser;
@@ -145,7 +151,7 @@ impl Parser {
         // clone context from this parser
         let new_ctx = self.context.clone();
         // initialize new parser with cloned context and parse
-        let mut scoped_parser = Self::new_internal(p, new_ctx)?;
+        let mut scoped_parser = Self::new_internal(p, None, new_ctx)?;
         f(&mut scoped_parser)?;
         // deconstruct new parser into output
         let Parser { output, .. } = scoped_parser;
@@ -304,10 +310,36 @@ impl Parser {
     where
         P: AsRef<Path>
     {
-        Self::new_internal(path, None)
+        Self::new_internal(path, None, None)
     }
 
     /// Create a new parser with a specific context.
+    ///
+    /// # Arguments
+    ///
+    /// * `template` - The path to the template.
+    /// * `context` - The context.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use {
+    ///     arcana_core::{ JsonContext, Parser, },
+    ///     std::fs::canonicalize,
+    /// };
+    ///
+    /// let ctx = JsonContext::read(canonicalize("test/full/1/page.json").unwrap()).unwrap();
+    /// Parser::new_with_context("test/full/1/page.html", ctx).unwrap();
+    /// ```
+    pub
+    fn new_with_context<T>(template: T, context: JsonContext) -> Result<Self>
+    where
+        T: AsRef<Path>
+    {
+        Self::new_internal(template, None, Some(context))
+    }
+
+    /// Create a new parser with a specific context read from path.
     ///
     /// # Arguments
     ///
@@ -322,16 +354,47 @@ impl Parser {
     ///     std::fs::canonicalize,
     /// };
     ///
-    /// Parser::new_with_context("test/full/1/page.html", canonicalize("test/full/1/page.json").unwrap()).unwrap();
+    /// Parser::new_with_context_path("test/full/1/page.html", canonicalize("test/full/1/page.json").unwrap()).unwrap();
     /// ```
     pub
-    fn new_with_context<T, C>(template: T, context: C) -> Result<Self>
+    fn new_with_context_path<T, C>(template: T, context: C) -> Result<Self>
     where
         T: AsRef<Path>,
         C: AsRef<Path>
     {
         let ctx = JsonContext::read(context)?;
-        Self::new_internal(template, Some(ctx))
+        Self::new_internal(template, None, Some(ctx))
+    }
+
+    /// Create a new parser with an input string, pseudo-path, and a specific context.
+    ///
+    /// # Arguments
+    ///
+    /// * `template` - The path to the template.
+    /// * `context` - The path to the context.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use {
+    ///     arcana_core::{ JsonContext, Parser },
+    ///     std::fs::canonicalize,
+    /// };
+    ///
+    /// let mut p = Parser::from_string_and_path_with_context(
+    ///     "./fake.path",
+    ///     "${title|replace \" \" \"\"|lower}".to_owned(),
+    ///     JsonContext::read(canonicalize("test/full/1/page.json").unwrap()).unwrap()
+    /// ).unwrap();
+    /// p.parse().unwrap();
+    /// assert_eq!("fulltest1", p.as_output());
+    /// ```
+    pub
+    fn from_string_and_path_with_context<T>(template: T, content: String, context: JsonContext) -> Result<Self>
+    where
+        T: AsRef<Path>,
+    {
+        Self::new_internal(template, Some(content), Some(context))
     }
 
     fn esc_endblock(&mut self) {

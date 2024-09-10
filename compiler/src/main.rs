@@ -32,7 +32,7 @@ use {
         path::{ Path, PathBuf, },
         process::exit as pexit,
     },
-    arcana_core::{ Error, Parser, Result, },
+    arcana_core::{ Error, JsonContext, Parser, Result, },
 };
 
 macro_rules! vprint {
@@ -81,6 +81,15 @@ struct CompileAgainstDirectory {
     extensions: Option<Vec<String>>,
 }
 
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct CompileAgainstTarget {
+    alias: String,
+    for_each: bool,
+    filename_extractor: Option<String>,
+    alias_to: Option<String>,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 struct CompileAgainst {
@@ -89,6 +98,8 @@ struct CompileAgainst {
     context: Option<PathBuf>,
     contexts: Option<Vec<PathBuf>>,
     context_directory: Option<CompileAgainstDirectory>,
+    #[serde(default="Vec::new")]
+    target: Vec<CompileAgainstTarget>,
 }
 
 #[derive(Deserialize)]
@@ -137,6 +148,9 @@ const HELP_COMPILE_AGAINST_DESTINATION: &str = include_str!(
 );
 const HELP_COMPILE_AGAINST_CONTEXT_DIRECTORY: &str = include_str!(
     "../resources/compile-against-context-directory.txt"
+);
+const HELP_COMPILE_AGAINST_TARGET: &str = include_str!(
+    "../resources/compile-against-target.txt"
 );
 
 // compile-directory
@@ -261,7 +275,53 @@ fn output(p: Parser) -> String {
     output
 }
 
-fn compile_against<C, T, D>(verbose: bool, ctx: C, tmpl: T, dst: D, dst_ext: &Option<String>) -> Result<()>
+fn get_fex_and_contexts_from_target_iter<'a>(
+    mut ctxs: Vec<JsonContext>, target_iter: &mut std::slice::Iter<'a, CompileAgainstTarget>
+) -> Result<(Option<String>, Vec<JsonContext>)> {
+    let mut fex = None;
+
+    while let Some(t) = target_iter.next() {
+        fex = t.filename_extractor.clone();
+
+        if t.for_each {
+            ctxs = ctxs.into_iter()
+                .map(|ctx| ctx.get_each_as_context(&t.alias, t.alias_to.clone()))
+                .collect::<Result<Vec<Vec<JsonContext>>>>()?
+                .into_iter()
+                .flatten()
+                .collect::<Vec<JsonContext>>();
+        }
+        else {
+            ctxs = ctxs.into_iter()
+                .map(|ctx| ctx.get_as_context(&t.alias, t.alias_to.clone()))
+                .collect::<Result<Vec<JsonContext>>>()?;
+        }
+    }
+
+    Ok((fex, ctxs))
+}
+
+fn get_fex_and_contexts_from_target<P>(
+    ctx_path: P, target: &Vec<CompileAgainstTarget>
+) -> Result<(Option<String>, Vec<JsonContext>)>
+where
+    P: AsRef<Path>
+{
+    let ctx: PathBuf = ctx_path.as_ref().into();
+
+    let context_path = canonicalize(&ctx)
+        .map_err(|e| Error::IO(e, ctx.clone()))?;
+    let context = JsonContext::read(context_path)?;
+
+    let mut target_iter = target.iter();
+
+    Ok(get_fex_and_contexts_from_target_iter(vec![ context ], &mut target_iter)?)
+}
+
+fn compile_against<C, T, D>(
+    verbose: bool, ctx: C, tmpl: T, dst: D, dst_ext: &Option<String>,
+    target: &Vec<CompileAgainstTarget>
+) -> Result<()>
 where
     C: AsRef<Path>,
     T: AsRef<Path>,
@@ -271,32 +331,43 @@ where
     let tmpl: PathBuf = tmpl.as_ref().into();
     let dst: PathBuf = dst.as_ref().into();
 
-    let filename = ctx.file_stem()
+    let mut filename = ctx.file_stem()
         .map(|v| v.to_str().unwrap_or(""))
         .or(Some(""))
         .map(|v| v.to_owned())
         .unwrap();
 
-    let context_path = canonicalize(&ctx)
-        .map_err(|e| Error::IO(e, ctx.clone()))?;
-    let mut p = Parser::new_with_context(&tmpl, context_path)?;
-    p.parse()?;
+    let (fex, contexts) = get_fex_and_contexts_from_target(&ctx, target)?;
 
-    let mut dest = dst.clone();
-    if let Some(ext) = dst_ext {
-        dest.push(format!("{filename}.{ext}"));
+    for context in contexts {
+        let mut p = Parser::new_with_context(&tmpl, context.clone())?;
+        p.parse()?;
+
+        let mut dest = dst.clone();
+
+        if let Some(fex) = &fex {
+            let mut fex_p = Parser::from_string_and_path_with_context(
+                "./tmp.json", fex.to_owned(), context
+            )?;
+            fex_p.parse()?;
+            filename = fex_p.as_output();
+        }
+
+        if let Some(ext) = dst_ext {
+            dest.push(format!("{filename}.{ext}"));
+        }
+        else {
+            dest.push(&filename);
+        }
+
+        vprint!(verbose, "Compiling {tmpl:?} against context {ctx:?} to {dest:?}");
+
+        let mut dir = dest.clone();
+        dir.pop();
+        create_dir_all(&dir).map_err(|e| Error::IO(e, dir.clone()))?;
+
+        write(&dest, output(p)).map_err(|e| Error::IO(e, dest.clone()))?;
     }
-    else {
-        dest.push(filename);
-    }
-
-    vprint!(verbose, "Compiling {tmpl:?} against context {ctx:?} to {dest:?}");
-
-    let mut dir = dest.clone();
-    dir.pop();
-    create_dir_all(&dir).map_err(|e| Error::IO(e, dir.clone()))?;
-
-    write(&dest, output(p)).map_err(|e| Error::IO(e, dest.clone()))?;
 
     Ok(())
 }
@@ -443,6 +514,7 @@ where
                     cnd_remove_file(verbose, &depl, &dst)?;
                 }
             },
+            // TODO: Handle clean when 'target' is included.
             Action::CompileAgainst(ca) => if let Some(ctx) = ca.context {
                 let dst = as_output_path(
                     ctx,
@@ -632,6 +704,140 @@ impl Options {
         }
     }
 
+    fn compile_against_target_alias(
+        &mut self, args: &mut Args, outer: [String; 3], alias: &mut Option<String>
+    ) {
+        let [ a, b, c, ] = outer;
+
+        if alias.is_some() {
+            self.mtonce_sub(c, Some(vec![ a, b, ]));
+        }
+
+        if let Some(a) = args.next() {
+            std::mem::swap(alias, &mut Some(a));
+        }
+        else {
+            self.missing_sub("<als>", c, Some(vec![ a, b, ]));
+        }
+    }
+
+    fn compile_against_target_for_each(
+        &mut self, outer: [String; 3], for_each: &mut bool
+    ) {
+        let [ a, b, c, ] = outer;
+
+        if *for_each {
+            self.mtonce_sub(c, Some(vec![ a, b, ]));
+        }
+
+        std::mem::swap(for_each, &mut true);
+    }
+
+    fn compile_against_target_file_extractor(
+        &mut self, args: &mut Args, outer: [String; 3], fex: &mut Option<String>,
+    ) {
+        let [ a, b, c, ] = outer;
+
+        if fex.is_some() {
+            self.mtonce_sub(c, Some(vec![ a, b, ]));
+        }
+
+        if let Some(f) = args.next() {
+            std::mem::swap(fex, &mut Some(f));
+        }
+        else {
+            self.missing_sub("<arc>", c, Some(vec![ a, b, ]));
+        }
+    }
+
+    fn compile_against_target_alias_to(
+        &mut self, args: &mut Args, outer: [String; 3], ato: &mut Option<String>,
+    ) {
+        let [ a, b, c, ] = outer;
+
+        if ato.is_some() {
+            self.mtonce_sub(c, Some(vec![ a, b, ]));
+        }
+
+        if let Some(f) = args.next() {
+            std::mem::swap(ato, &mut Some(f));
+        }
+        else {
+            self.missing_sub("<als>", c, Some(vec![ a, b, ]));
+        }
+    }
+
+    fn compile_against_target(
+        &mut self, args: &mut Args, outer: [String; 2], target: &mut Vec<CompileAgainstTarget>
+    ) {
+        let [ a, b, ] = outer;
+
+        let mut alias = None;
+        let mut for_each = false;
+        let mut fex = None;
+        let mut ato = None;
+
+        while let Some(arg) = args.next() {
+            if arg.starts_with("--") {
+                match arg.as_str() {
+                    "--help" => {
+                        println!("{HELP_COMPILE_AGAINST_TARGET}");
+                        pexit(0);
+                    },
+                    "--alias" => self.compile_against_target_alias(
+                        args, [a.clone(), b.clone(), arg], &mut alias
+                    ),
+                    "--for-each" => self.compile_against_target_for_each(
+                        [a.clone(), b.clone(), arg], &mut for_each
+                    ),
+                    "--filename-extractor" => self.compile_against_target_file_extractor(
+                        args, [a.clone(), b.clone(), arg], &mut fex
+                    ),
+                    "--alias-to" => self.compile_against_target_alias_to(
+                        args, [a.clone(), b.clone(), arg], &mut ato
+                    ),
+                    "--" => break,
+                    _ => self.unknown_sub(arg, Some(vec![ a, b, ])),
+                }
+            }
+            else if arg.starts_with('-') {
+                let mut chars = arg.chars();
+                chars.next();
+
+                for c in chars {
+                    let arg = format!("-{c}");
+                    match c {
+                        'a' => self.compile_against_target_alias(args, [a.clone(), b.clone(), arg], &mut alias),
+                        'f' => self.compile_against_target_for_each([a.clone(), b.clone(), arg], &mut for_each),
+                        'h'=> {
+                            println!("{HELP_COMPILE_AGAINST_TARGET}");
+                            pexit(0);
+                        },
+                        't' => self.compile_against_target_alias_to(
+                            args, [a.clone(), b.clone(), arg], &mut ato
+                        ),
+                        'x' => self.compile_against_target_file_extractor(args, [a.clone(), b.clone(), arg], &mut fex),
+                        _ => self.unknown_sub(arg, Some(vec![ a, b, ])),
+                    }
+                }
+            }
+            else {
+                self.unknown_sub(arg, Some(vec![ a, b, ]));
+            }
+        }
+
+        if alias.is_none() {
+            self.missing_sub("--alias", b, Some(vec![ a, ]));
+        }
+
+        target.push(CompileAgainstTarget {
+            alias: alias.unwrap(),
+            for_each,
+            filename_extractor: fex,
+            alias_to: ato,
+        });
+    }
+
     fn compile_against_context(&mut self, args: &mut Args, outer: [String; 2], ctxs: &mut Vec<PathBuf>) {
         let [ a, b, ] = outer;
 
@@ -733,6 +939,7 @@ impl Options {
         let mut dst = None;
         let mut ctxs = Vec::new();
         let mut ctx_dir = None;
+        let mut target = Vec::new();
 
         while let Some(arg) = args.next() {
             if arg.starts_with("--") {
@@ -745,6 +952,7 @@ impl Options {
                     "--destination" => self.compile_against_destination(args, [outer.clone(), arg], &mut dst),
                     "--context" => self.compile_against_context(args, [outer.clone(), arg], &mut ctxs),
                     "--context-directory" => self.compile_against_context_directory(args, [outer.clone(), arg], &mut ctx_dir),
+                    "--target" => self.compile_against_target(args, [outer.clone(), arg], &mut target),
                     "--" => break,
                     _ => self.unknown_sub(arg, Some(vec![ outer, ])),
                 }
@@ -762,6 +970,7 @@ impl Options {
                             println!("{HELP_COMPILE_AGAINST}");
                             pexit(0);
                         },
+                        'r' => self.compile_against_target(args, [outer.clone(), arg], &mut target),
                         't' => self.compile_against_template(args, [outer.clone(), arg], &mut tmp),
                         'x' => self.compile_against_context_directory(args, [outer.clone(), arg], &mut ctx_dir),
                         _ => self.unknown_sub(arg, Some(vec![ outer, ])),
@@ -791,6 +1000,7 @@ impl Options {
                     context_directory: ctx_dir,
                     template: tmp.unwrap(),
                     destination: dst.unwrap(),
+                    target,
                 }));
             },
             1 => {
@@ -800,6 +1010,7 @@ impl Options {
                     context_directory: None,
                     template: tmp.unwrap(),
                     destination: dst.unwrap(),
+                    target,
                 }));
             },
             _ => {
@@ -809,6 +1020,7 @@ impl Options {
                     context_directory: None,
                     template: tmp.unwrap(),
                     destination: dst.unwrap(),
+                    target,
                 }));
             }
         }
@@ -1581,7 +1793,8 @@ fn main() -> Result<()> {
                         context,
                         opts.template,
                         opts.destination.directory,
-                        &opts.destination.extension
+                        &opts.destination.extension,
+                        &opts.target
                     )?;
                 }
                 else if let Some(contexts) = opts.contexts {
@@ -1591,7 +1804,8 @@ fn main() -> Result<()> {
                             context,
                             &opts.template,
                             &opts.destination.directory,
-                            &opts.destination.extension
+                            &opts.destination.extension,
+                            &opts.target
                         )?;
                     }
                 }
@@ -1609,7 +1823,8 @@ fn main() -> Result<()> {
                             context,
                             &opts.template,
                             &opts.destination.directory,
-                            &opts.destination.extension
+                            &opts.destination.extension,
+                            &opts.target
                         )?;
                     }
                 }
