@@ -58,3 +58,6 @@ const TRIM: &str = "trim";
 
 pub(crate)
 const SPLIT: &str = "split";
+
+pub(crate)
+const JSON: &str = "json";

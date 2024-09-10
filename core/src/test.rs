@@ -599,6 +599,139 @@ fn set_item_8_no_item() {
 }
 
 #[test]
+fn set_json_1() {
+    let mut p = Parser::new("test/set_json/1/template.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("First: 31", p.as_output());
+}
+
+#[test]
+fn set_json_2() {
+    let mut p = Parser::new("test/set_json/2/template.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("First", p.as_output());
+}
+
+#[test]
+#[should_panic]
+fn set_json_3() {
+    let mut p = Parser::new("test/set_json/3/template.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("First", p.as_output());
+}
+
+#[test]
+fn set_json_4() {
+    let mut p = Parser::new("test/set_json/4/template.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("First, Second, Third", p.as_output());
+}
+
+#[test]
+fn set_json_5() {
+    let mut p = Parser::new("test/set_json/5/template.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("The Name", p.as_output());
+}
+
+#[test]
+fn set_json_6() {
+    let mut p = Parser::new("test/set_json/6/template.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("{\"name\":\"An Object\"}", p.as_output());
+}
+
+#[test]
+fn set_json_7() {
+    let mut p = Parser::new("test/set_json/7/template.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!(
+        std::fs::canonicalize("./test/set_json/7/template.arcana").unwrap(),
+        PathBuf::from(p.as_output())
+    );
+}
+
+#[test]
+fn set_json_8() {
+    let mut p = Parser::new("test/set_json/8/set.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("This is the item description.", p.as_output());
+}
+
+#[test]
+fn set_json_9() {
+    let mut p = Parser::new("test/set_json/9/set.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("First\nSecond\nThird\nFourth", p.as_output());
+}
+
+#[test]
+fn set_json_10() {
+    let mut p = Parser::new("test/set_json/10/set.arcana").unwrap();
+    p.parse().unwrap();
+    let mut current = current_dir().unwrap();
+    current.push("test/set_json/10/path/to/file.txt");
+    assert_eq!(
+        current.to_str().unwrap_or("").to_owned(),
+        p.as_output()
+    );
+}
+
+#[test]
+fn set_json_11() {
+    let mut p = Parser::new("test/set_json/11/set.arcana").unwrap();
+    p.parse().unwrap();
+    let current = current_dir().unwrap();
+    let mut first = current.clone();
+    first.push("test/set_json/11/path/to/file.txt");
+    let first_str = first.to_str().unwrap_or("");
+    let mut second = current.clone();
+    second.push("test/different/file.txt");
+    let second_str = second.to_str().unwrap_or("");
+    let third = PathBuf::from("/absolute/path.txt");
+    let third_str = third.to_str().unwrap_or("");
+    assert_eq!(
+        format!("{first_str}\n{second_str}\n{third_str}"),
+        p.as_output()
+    );
+}
+
+#[test]
+fn set_json_12() {
+    let mut p = Parser::new("test/set_json/12/set.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("This is the value\nThis is the value", p.as_output());
+}
+
+#[test]
+fn set_json_13() {
+    let mut p = Parser::new("test/set_json/13/set.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("This is the value\nThis is the value", p.as_output());
+}
+
+#[test]
+fn set_json_14() {
+    let mut p = Parser::new("test/set_json/14/set.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("This is the value\nThis is the value", p.as_output());
+}
+
+#[test]
+fn set_json_15_has_item() {
+    let mut p = Parser::new("test/set_json/15/has-item.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("\n\tHere is the name.\n", p.as_output());
+}
+
+#[test]
+fn set_json_15_no_item() {
+    let mut p = Parser::new("test/set_json/15/no-item.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("\n\tNo name.\n", p.as_output());
+}
+
+#[test]
 fn unset_item_1() {
     let mut p = Parser::new("test/unset_item/1/unset.arcana").unwrap();
     p.parse().unwrap();

@@ -1,0 +1,13 @@
+>{{
+	"items": [
+		{
+			"name": "First"
+		},
+		{
+			"name": "Second"
+		},
+		{
+			"name": "Third"
+		}
+	]
+}}<@{item in items}{%{!$loop.first}{, }${item.name}}

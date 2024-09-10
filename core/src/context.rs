@@ -66,11 +66,16 @@ impl<S: AsRef<str>> From<S> for Alias {
     fn from(input: S) -> Self {
         let i = input.as_ref();
 
-        Self {
-            scope: i.split(SCOPESEP)
-                .map(|seg| seg.to_owned())
-                .collect::<Vec<String>>(),
+        let scope = if i == crate::parser::consts::ROOT {
+            vec![]
         }
+        else {
+            i.split(SCOPESEP)
+                .map(|seg| seg.to_owned())
+                .collect::<Vec<String>>()
+        };
+
+        Self { scope, }
     }
 }
 
@@ -143,19 +148,11 @@ impl JsonContext {
         })
     }
 
-    fn read_internal<P: AsRef<Path>, A: Into<Alias>>(p: P, alias: Option<A>) -> Result<Self> {
-        let p = clean_path(p);
+    pub(crate)
+    fn read_from_string<P: AsRef<Path>, S: AsRef<str>, A: Into<Alias>>(path: P, source: S, alias: Option<A>) -> Result<Self> {
+        let p: PathBuf = path.as_ref().into();
 
-        if p.is_relative() {
-            return Err(Error::IllegalRelativePath(p));
-        }
-        else if p.is_dir() {
-            return Err(Error::IllegalDirPath(p));
-        }
-
-        let file = read_file(&p)?;
-
-        let mut properties = from_json_str::<JsonValue>(&file)
+        let mut properties = from_json_str::<JsonValue>(source.as_ref())
             .map_err(|e| Error::JsonParse(e, p.clone()))?;
 
         if !matches!(properties, JsonValue::Object(_)) {
@@ -186,23 +183,36 @@ impl JsonContext {
         })
     }
 
+    fn read_internal<P: AsRef<Path>, A: Into<Alias>>(p: P, alias: Option<A>) -> Result<Self> {
+        let p = clean_path(p);
+
+        if p.is_relative() {
+            return Err(Error::IllegalRelativePath(p));
+        }
+        else if p.is_dir() {
+            return Err(Error::IllegalDirPath(p));
+        }
+
+        let file = read_file(&p)?;
+
+        Self::read_from_string(p, file, alias)
+    }
+
     pub(crate)
     fn read<P: AsRef<Path>>(p: P) -> Result<Self> {
         Self::read_internal::<P, Alias>(p, None)
     }
 
-    fn read_in_internal<P, A>(&mut self, path: P, alias: Option<A>) -> Result<()>
+    pub(crate)
+    fn merge<P>(&mut self, source_path: P, ctx: JsonContext) -> Result<()>
     where
-        P: AsRef<Path>,
-        A: Into<Alias>
+        P: AsRef<Path>
     {
-        let ctx = Self::read_internal(path.as_ref(), alias)?;
-
         let ctx_map = if let JsonValue::Object(map) = ctx.properties {
             map
         }
         else {
-            return Err(Error::NotAMap(path.as_ref().into()));
+            return Err(Error::NotAMap(source_path.as_ref().into()));
         };
 
         let path_to_scope = if let Some(path) = ctx.scoped_paths.get(&Alias::default()) {
@@ -218,6 +228,16 @@ impl JsonContext {
         }
 
         Ok(())
+    }
+
+    fn read_in_internal<P, A>(&mut self, path: P, alias: Option<A>) -> Result<()>
+    where
+        P: AsRef<Path>,
+        A: Into<Alias>
+    {
+        let ctx = Self::read_internal(path.as_ref(), alias)?;
+
+        self.merge(path, ctx)
     }
 
     pub(crate)
@@ -567,17 +587,10 @@ impl JsonContext {
         let a = alias.into();
         let val = self.get_internal(a.clone())?.0;
 
-        if let Some(s) = val.as_str() {
-            Ok(Some(s.to_owned()))
-        }
-        else if let Some(i) = val.as_number() {
-            Ok(Some(i.to_string()))
-        }
-        else if !val.is_null() {
-            Err(Error::ValueNotString(a))
-        }
-        else {
-            Ok(None)
+        match val {
+            JsonValue::String(s) => Ok(Some(s.to_owned())),
+            JsonValue::Null => Ok(None),
+            v => Ok(Some(v.to_string())),
         }
     }
 

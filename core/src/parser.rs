@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-mod consts;
+pub(crate) mod consts;
 
 use {
     crate::{
@@ -52,6 +52,7 @@ enum IncludeContentMod {
     Replace(String, String),
     Split(usize, usize),
     Trim,
+    Json,
 }
 
 #[derive(PartialEq)]
@@ -698,6 +699,10 @@ impl Parser {
                 self.src_mut().take(consts::modif::TRIM.len());
                 mods.push(IncludeContentMod::Trim);
             }
+            else if self.src().pos().starts_with(consts::modif::JSON) {
+                self.src_mut().take(consts::modif::JSON.len());
+                mods.push(IncludeContentMod::Json);
+            }
             else if self.src().pos().starts_with(consts::modif::SPLIT) {
                 self.src_mut().take(consts::modif::SPLIT.len());
                 self.src_mut().trim_start();
@@ -861,27 +866,41 @@ impl Parser {
             false
         };
 
+        let is_json = if let Some(mods) = mods.as_ref() {
+            mods.iter().any(|m| m.eq(&IncludeContentMod::Json))
+        }
+        else {
+            false
+        };
+
         let mut value = if bypass {
             "".to_owned()
         }
-        else if nullable {
-            if is_path {
-                self.optional_context(|ctx| ctx.get_path_opt(alias))?
-                    .unwrap_or(PathBuf::new())
-                    .to_str()
-                    .unwrap_or("")
-                    .to_owned()
-            }
-            else {
-                self.optional_context(|ctx| ctx.get_stringlike_opt(alias))?
-                    .unwrap_or(String::new())
-            }
+        else if nullable && is_json {
+            self.optional_context(|ctx| Ok(Some(ctx.get_value(alias)?.clone())))?
+                .unwrap_or(JsonValue::Null)
+                .to_string()
+        }
+        else if nullable && is_path {
+            self.optional_context(|ctx| ctx.get_path_opt(alias))?
+                .unwrap_or(PathBuf::new())
+                .to_str()
+                .unwrap_or("")
+                .to_owned()
+        }
+        else if is_json {
+            self.enforce_context(|ctx| Ok(ctx.get_value(alias)?.clone()))?
+                .to_string()
         }
         else if is_path {
             self.enforce_context(|ctx| ctx.get_path(alias))?
                 .to_str()
                 .unwrap_or("")
                 .to_owned()
+        }
+        else if nullable {
+            self.optional_context(|ctx| ctx.get_stringlike_opt(alias))?
+                .unwrap_or(String::new())
         }
         else {
             self.enforce_context(|ctx| ctx.get_stringlike(alias))?
@@ -895,6 +914,7 @@ impl Parser {
                     IncludeContentMod::Replace(from, to) => value
                         .replace(&from, &to),
                     IncludeContentMod::Path => value,
+                    IncludeContentMod::Json => value,
                     IncludeContentMod::Filename => {
                         let p = PathBuf::from(value);
                         p.file_stem().and_then(|f| f.to_str())
@@ -2074,6 +2094,51 @@ impl Parser {
         Ok(true)
     }
 
+    fn set_json(&mut self, bypass: bool) -> Result<bool> {
+        if !self.src().pos().starts_with(consts::block::SET_JSON) {
+            return Ok(false);
+        }
+
+        const TAG_NAME: &str = "set-json";
+
+        self.src_mut().take(consts::block::SET_JSON.len());
+
+        fn unexpected_eof(p: &mut Parser, coord: Coordinate) -> Result<()> {
+            p.unexpected_eof(|| Error::UnterminatedTag(
+                TAG_NAME.to_owned(),
+                coord,
+                p.src().file().to_owned(),
+            ))
+        }
+
+        let start = self.src().coord();
+        unexpected_eof(self, start)?;
+
+        let output = self.spawn_sealed_internal_parser(|p| {
+            while !p.src().eof() && !p.src().pos().starts_with(consts::block::END_SET_JSON) {
+                p.parse_next(bypass)?;
+            }
+
+            unexpected_eof(p, start)?;
+            p.src_mut().take(consts::block::END_SET_JSON.len());
+            Ok(())
+        })?;
+
+        if !bypass {
+            let s_path = self.path.clone();
+            let new_ctx = JsonContext::read_from_string(&s_path, output, Some(consts::ROOT))?;
+
+            if let Some(ctx) = self.ctx_mut() {
+                ctx.merge(s_path, new_ctx)?;
+            }
+            else {
+                self.context = Some(new_ctx);
+            }
+        }
+
+        Ok(true)
+    }
+
     fn unset_item(&mut self) -> Result<bool> {
         if !self.src().pos().starts_with(consts::block::UNSET_ITEM) {
             return Ok(false);
@@ -2161,7 +2226,8 @@ impl Parser {
             self.src().pos().starts_with(consts::block::esc::INCLUDE_CONTENT) ||
             self.src().pos().starts_with(consts::block::esc::EXPRESSION) ||
             self.src().pos().starts_with(consts::block::esc::SET_ITEM) ||
-            self.src().pos().starts_with(consts::block::esc::UNSET_ITEM)
+            self.src().pos().starts_with(consts::block::esc::UNSET_ITEM) ||
+            self.src().pos().starts_with(consts::block::esc::SET_JSON)
         {
             self.src_mut().take(consts::block::esc::ESCAPE.len());
             let taken = self.src_mut().take(2).unwrap();
@@ -2194,7 +2260,9 @@ impl Parser {
             // is set-item
             self.set_item(bypass)? ||
             // is remove-item
-            self.unset_item()?
+            self.unset_item()? ||
+            // is set-json
+            self.set_json(bypass)?
         {
             // no action required
         }

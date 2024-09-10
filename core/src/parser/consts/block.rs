@@ -54,6 +54,12 @@ pub(crate)
 const FOR_FILE: &str = "*{";
 
 pub(crate)
+const SET_JSON: &str = ">{";
+
+pub(crate)
+const END_SET_JSON: &str = "}<";
+
+pub(crate)
 const SET_ITEM: &str = "={";
 
 pub(crate)

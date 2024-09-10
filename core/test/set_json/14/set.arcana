@@ -1,0 +1,2 @@
+.{"ctx.json"}>{{"value": "${obj.value}"}}<${value}
+${obj.value}

@@ -1,0 +1,5 @@
+%{the-item}{
+	>{{"name":${the-item.name|json}}}<${name}
+}{
+	No name.
+}
