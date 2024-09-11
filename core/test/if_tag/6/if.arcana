@@ -1,0 +1,10 @@
+={{{
+	"number": 54,
+	"boolean": true,
+	"false": false,
+	"string": "This is a string"
+}}}=
+%{number==number&&string==string}{true}{false}
+%{boolean!=boolean&&number==number}{true}{false}
+%{false||!string empty}{true}{false}
+%{!string empty||false}{true}{false}

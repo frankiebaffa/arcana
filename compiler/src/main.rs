@@ -275,13 +275,13 @@ fn output(p: Parser) -> String {
     output
 }
 
-fn get_fex_and_contexts_from_target_iter<'a>(
-    mut ctxs: Vec<JsonContext>, target_iter: &mut std::slice::Iter<'a, CompileAgainstTarget>
+fn get_fex_and_contexts_from_target_iter(
+    mut ctxs: Vec<JsonContext>, target_iter: &mut std::slice::Iter<'_, CompileAgainstTarget>
 ) -> Result<(Option<String>, Vec<JsonContext>)> {
     let mut fex = None;
 
-    while let Some(t) = target_iter.next() {
-        fex = t.filename_extractor.clone();
+    for t in target_iter.by_ref() {
+        fex.clone_from(&t.filename_extractor);
 
         if t.for_each {
             ctxs = ctxs.into_iter()
@@ -302,7 +302,7 @@ fn get_fex_and_contexts_from_target_iter<'a>(
 }
 
 fn get_fex_and_contexts_from_target<P>(
-    ctx_path: P, target: &Vec<CompileAgainstTarget>
+    ctx_path: P, target: &[CompileAgainstTarget]
 ) -> Result<(Option<String>, Vec<JsonContext>)>
 where
     P: AsRef<Path>
@@ -315,12 +315,12 @@ where
 
     let mut target_iter = target.iter();
 
-    Ok(get_fex_and_contexts_from_target_iter(vec![ context ], &mut target_iter)?)
+    get_fex_and_contexts_from_target_iter(vec![ context ], &mut target_iter)
 }
 
 fn compile_against<C, T, D>(
     verbose: bool, ctx: C, tmpl: T, dst: D, dst_ext: &Option<String>,
-    target: &Vec<CompileAgainstTarget>
+    target: &[CompileAgainstTarget]
 ) -> Result<()>
 where
     C: AsRef<Path>,
@@ -1846,13 +1846,12 @@ fn main() -> Result<()> {
                 dir.pop();
                 create_dir_all(&dir).map_err(|e| Error::IO(e, dir.clone()))?;
 
-                let dest;
-                if cfile.destination.is_dir() {
-                    dest = as_output_path(&cfile.source, cfile.destination, &None)?;
+                let dest = if cfile.destination.is_dir() {
+                    as_output_path(&cfile.source, cfile.destination, &None)?
                 }
                 else {
-                    dest = cfile.destination;
-                }
+                    cfile.destination
+                };
 
                 copy(&cfile.source, &dest).map_err(|e| Error::IO(e, cfile.source.clone()))?;
             },

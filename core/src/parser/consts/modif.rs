@@ -45,9 +45,6 @@ pub(crate)
 const PATHS: &str = "paths";
 
 pub(crate)
-const ARRAY: &str = "array";
-
-pub(crate)
 const PATH: &str = "path";
 
 pub(crate)

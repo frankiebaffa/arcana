@@ -77,12 +77,13 @@ enum ForItemMod {
 enum IfCondition {
     Exists,
     Empty,
-}
-
-#[derive(PartialEq)]
-enum SetValueMod {
-    Array,
-    Path,
+    Eq,
+    Ne,
+    Gt,
+    Ge,
+    Lt,
+    Le,
+    Truthy
 }
 
 #[derive(PartialEq)]
@@ -1175,7 +1176,7 @@ impl Parser {
                 p.src_mut().take(1);
 
                 let block_output = std::mem::take(&mut p.output);
-                p.set_value(consts::CONTENT, block_output)?;
+                p.set_json_value(consts::CONTENT, block_output.into())?;
 
                 let mut file_output = p.include_file_parse(path, is_raw, is_md, bypass)?;
                 std::mem::swap(&mut file_output, &mut p.output);
@@ -1202,8 +1203,32 @@ impl Parser {
             self.src_mut().take(consts::exp::EMPTY.len());
             IfCondition::Empty
         }
+        else if self.src().pos().starts_with(consts::exp::EQ) {
+            self.src_mut().take(consts::exp::EQ.len());
+            IfCondition::Eq
+        }
+        else if self.src().pos().starts_with(consts::exp::NE) {
+            self.src_mut().take(consts::exp::NE.len());
+            IfCondition::Ne
+        }
+        else if self.src().pos().starts_with(consts::exp::GE) {
+            self.src_mut().take(consts::exp::GE.len());
+            IfCondition::Ge
+        }
+        else if self.src().pos().starts_with(consts::exp::GT) {
+            self.src_mut().take(1);
+            IfCondition::Gt
+        }
+        else if self.src().pos().starts_with(consts::exp::LE) {
+            self.src_mut().take(consts::exp::LE.len());
+            IfCondition::Le
+        }
+        else if self.src().pos().starts_with(consts::exp::LT) {
+            self.src_mut().take(1);
+            IfCondition::Lt
+        }
         else {
-            IfCondition::Exists
+            IfCondition::Truthy
         }
     }
 
@@ -1242,9 +1267,13 @@ impl Parser {
         Ok(false)
     }
 
-    fn if_is_true<A>(&mut self, negate: bool, condition: IfCondition, alias: A) -> Result<bool>
+    fn if_is_true<A, O>(
+        &mut self, negate: bool, condition: IfCondition, alias: A,
+        other_alias: Option<O>
+    ) -> Result<bool>
     where
-        A: Into<Alias>
+        A: Into<Alias>,
+        O: Into<Alias>,
     {
         // set pseudo value to avoid errors, output will be ditched if
         // the condition doesn't match
@@ -1265,6 +1294,48 @@ impl Parser {
                     None => if !negate { Ok(false) } else { Ok(true) },
                 }
             },
+            IfCondition::Truthy => {
+                match self.optional_context(|ctx| Ok(Some(ctx.truthy(alias)?)))? {
+                    Some(truthy) => if !negate { Ok(truthy) } else { Ok(!truthy) },
+                    None => if !negate { Ok(false) } else { Ok(true) },
+                }
+            },
+            IfCondition::Eq => if !negate {
+                Ok(self.enforce_context(|ctx| ctx.eq(alias, other_alias.unwrap()))?)
+            }
+            else {
+                Ok(!self.enforce_context(|ctx| ctx.eq(alias, other_alias.unwrap()))?)
+            },
+            IfCondition::Ne => if !negate {
+                Ok(self.enforce_context(|ctx| ctx.ne(alias, other_alias.unwrap()))?)
+            }
+            else {
+                Ok(!self.enforce_context(|ctx| ctx.ne(alias, other_alias.unwrap()))?)
+            },
+            IfCondition::Gt => if !negate {
+                Ok(self.enforce_context(|ctx| ctx.gt(alias, other_alias.unwrap()))?)
+            }
+            else {
+                Ok(!self.enforce_context(|ctx| ctx.gt(alias, other_alias.unwrap()))?)
+            },
+            IfCondition::Ge => if !negate {
+                Ok(self.enforce_context(|ctx| ctx.ge(alias, other_alias.unwrap()))?)
+            }
+            else {
+                Ok(!self.enforce_context(|ctx| ctx.ge(alias, other_alias.unwrap()))?)
+            },
+            IfCondition::Lt => if !negate {
+                Ok(self.enforce_context(|ctx| ctx.lt(alias, other_alias.unwrap()))?)
+            }
+            else {
+                Ok(!self.enforce_context(|ctx| ctx.lt(alias, other_alias.unwrap()))?)
+            },
+            IfCondition::Le => if !negate {
+                Ok(self.enforce_context(|ctx| ctx.le(alias, other_alias.unwrap()))?)
+            }
+            else {
+                Ok(!self.enforce_context(|ctx| ctx.le(alias, other_alias.unwrap()))?)
+            },
         }
     }
 
@@ -1274,10 +1345,11 @@ impl Parser {
         }
 
         let start = self.src().coord();
+        const TAG_NAME: &str = "if";
 
         fn unexpected_eof_if(p: &mut Parser, coords: Coordinate) -> Result<()> {
             p.unexpected_eof(|| Error::UnterminatedTag(
-                "if".to_owned(),
+                TAG_NAME.to_owned(),
                 coords,
                 p.src().file().to_owned(),
             ))
@@ -1285,28 +1357,59 @@ impl Parser {
 
         // take if block
         self.src_mut().take(consts::block::IF.len());
-        self.src_mut().trim_start();
-        unexpected_eof_if(self, start)?;
 
-        let negate = if self.src().pos().starts_with(consts::exp::NOT) {
-            self.src_mut().take(1);
+        let mut is_true = false;
+        let mut bypass_rest_of_if = false;
+        loop {
             self.src_mut().trim_start();
             unexpected_eof_if(self, start)?;
 
-            true
+            let negate = if self.src().pos().starts_with(consts::exp::NOT) {
+                self.src_mut().take(1);
+                self.src_mut().trim_start();
+                unexpected_eof_if(self, start)?;
+
+                true
+            }
+            else {
+                false
+            };
+
+            let alias = self.alias(TAG_NAME)?;
+
+            self.src_mut().trim_start();
+            unexpected_eof_if(self, start)?;
+
+            let condition = self.if_condition();
+            self.src_mut().trim_start();
+            unexpected_eof_if(self, start)?;
+
+            let other_alias = match condition {
+                IfCondition::Eq|IfCondition::Ne|IfCondition::Gt|IfCondition::Ge|
+                IfCondition::Lt|IfCondition::Le => Some(self.alias(TAG_NAME)?),
+                IfCondition::Empty|IfCondition::Exists|IfCondition::Truthy => None
+            };
+
+            if !bypass_rest_of_if {
+                is_true = self.if_is_true(negate, condition, alias, other_alias)?;
+            }
+
+            if self.src().pos().starts_with(consts::exp::AND) {
+                self.src_mut().take(consts::exp::AND.len());
+                if !bypass_rest_of_if && !is_true {
+                    bypass_rest_of_if = true;
+                }
+            }
+            else if self.src().pos().starts_with(consts::exp::OR) {
+                self.src_mut().take(consts::exp::OR.len());
+                if !bypass_rest_of_if && is_true {
+                    bypass_rest_of_if = true;
+                }
+            }
+            else {
+                break;
+            }
         }
-        else {
-            false
-        };
-
-        let alias = self.alias("if")?;
-
-        self.src_mut().trim_start();
-        unexpected_eof_if(self, start)?;
-
-        let condition = self.if_condition();
-        self.src_mut().trim_start();
-        unexpected_eof_if(self, start)?;
 
         if !self.src().pos().starts_with(consts::block::ENDBLOCK) {
             return Err(self.illegal_character("if"));
@@ -1317,8 +1420,6 @@ impl Parser {
         self.chain_start("if", start)?;
 
         // parse if contents
-        let is_true = self.if_is_true(negate, condition, alias)?;
-
         let if_output = self.spawn_sealed_internal_parser(|p| {
             let start = p.src().coord();
 
@@ -1419,103 +1520,12 @@ impl Parser {
         Ok(Some(mods))
     }
 
-    fn get_value<F>(&mut self, from: F) -> Result<&JsonValue>
-    where
-        F: Into<Alias>
-    {
-        if let Some(ctx) = self.ctx_mut() {
-            Ok(ctx.get_value(from)?)
-        }
-        else {
-            Err(Error::ValueNotFound(from.into()))
-        }
-    }
-
-    fn clone_value<F, T>(&mut self, from: F, to: T) -> Result<()>
-    where
-        F: Into<Alias>,
-        T: Into<Alias>
-    {
-        let value = self.get_value(from)?.to_owned();
-        self.context.as_mut().unwrap().set_value(to, value)
-    }
-
-    fn set_value<A, S>(&mut self, alias: A, val: S) -> Result<()>
-    where
-        A: Into<Alias>,
-        S: AsRef<str>
-    {
-        if let Some(ctx) = self.ctx_mut() {
-            ctx.set_stringlike(alias, val)?;
-        }
-        else {
-            let mut new_ctx = JsonContext::faux_context(&self.path)?;
-            new_ctx.set_stringlike(alias, val)?;
-            self.context = Some(new_ctx);
-        }
-
-        Ok(())
-    }
-
-    fn push_stringlike<A, S>(&mut self, alias: A, val: S) -> Result<()>
-    where
-        A: Into<Alias>,
-        S: AsRef<str>,
-    {
-        if let Some(ctx) = self.ctx_mut() {
-            ctx.push_stringlike(alias, val)?;
-        }
-        else {
-            let mut new_ctx = JsonContext::faux_context(&self.path)?;
-            new_ctx.push_stringlike(alias, val)?;
-            self.context = Some(new_ctx);
-        }
-
-        Ok(())
-    }
-
-    fn push_pathlike<A, S, P>(&mut self, alias: A, val: S, path: P) -> Result<()>
-    where
-        A: Into<Alias>,
-        S: AsRef<str>,
-        P: AsRef<Path>,
-    {
-        if let Some(ctx) = self.ctx_mut() {
-            ctx.push_pathlike(alias, val, path)?;
-        }
-        else {
-            let mut new_ctx = JsonContext::faux_context(&self.path)?;
-            new_ctx.push_pathlike(alias, val, path)?;
-            self.context = Some(new_ctx);
-        }
-
-        Ok(())
-    }
-
     fn pop_value<A>(&mut self, alias: A) -> Result<()>
     where
         A: Into<Alias>
     {
         if let Some(ctx) = self.ctx_mut() {
             ctx.pop_stringlike(alias)?;
-        }
-
-        Ok(())
-    }
-
-    fn set_path<A, P, V>(&mut self, path: P, alias: A, value: V) -> Result<()>
-    where
-        A: Into<Alias>,
-        P: AsRef<Path>,
-        V: AsRef<str>
-    {
-        if let Some(ctx) = self.ctx_mut() {
-            ctx.set_path(path, alias, value)?;
-        }
-        else {
-            let mut new_ctx = JsonContext::faux_context(&self.path)?;
-            new_ctx.set_path(path, alias, value)?;
-            self.context = Some(new_ctx);
         }
 
         Ok(())
@@ -1563,25 +1573,12 @@ impl Parser {
     }
 
     fn loop_context(&mut self, idx: usize, len: usize) -> Result<()> {
-        self.set_value("$loop.index", idx.to_string())?;
-        self.set_value("$loop.position", (idx + 1).to_string())?;
-        self.set_value("$loop.length", len.to_string())?;
-        self.set_value("$loop.max", (len - 1).to_string())?;
-
-        if idx == 0 {
-            self.set_value("$loop.first", true.to_string())?;
-        }
-        else {
-            self.remove_value("$loop.first");
-        }
-
-        if idx == len - 1 {
-            self.set_value("$loop.last", true.to_string())?;
-        }
-        else {
-            self.remove_value("$loop.last");
-        }
-
+        self.set_json_value("$loop.index", idx.into())?;
+        self.set_json_value("$loop.position", (idx + 1).into())?;
+        self.set_json_value("$loop.length", len.into())?;
+        self.set_json_value("$loop.max", (len - 1).into())?;
+        self.set_json_value("$loop.first", (idx == 0).into())?;
+        self.set_json_value("$loop.last", (idx == len - 1).into())?;
         Ok(())
     }
 
@@ -1723,7 +1720,7 @@ impl Parser {
 
             let for_output = self.spawn_sealed_internal_parser(|p| {
                 // place value into map
-                p.set_value(alias_cl.clone(), item_str)?;
+                p.set_json_value(alias_cl.clone(), item_str.into())?;
 
                 // setup loop context
                 if !bypass && has_items {
@@ -2117,7 +2114,7 @@ impl Parser {
                 self.context = Some(JsonContext::faux_context(&self.path)?);
             }
 
-            self.enforce_context(|ctx| Ok(ctx.set_value(alias, JsonContext::parse_json(&s_path, output)?)?))?;
+            self.enforce_context(|ctx| ctx.set_value(alias, JsonContext::parse_json(&s_path, output)?))?;
         }
 
         Ok(true)
@@ -2284,7 +2281,7 @@ impl Parser {
         if let Some(extends) = self.extends.to_owned() {
             if !self.output.is_empty() {
                 let orig_output = std::mem::take(&mut self.output);
-                self.set_value(consts::CONTENT, orig_output)?;
+                self.set_json_value(consts::CONTENT, orig_output.into())?;
             }
             let output = self.spawn_parser(extends, |p| p.parse())?;
             self.output.push_str(&output);

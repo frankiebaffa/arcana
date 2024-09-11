@@ -437,6 +437,40 @@ fn if_tag_2_if() {
 }
 
 #[test]
+fn if_tag_3() {
+    let mut p = Parser::new("test/if_tag/3/if.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("\neq\neq\nle\nge\nge\nle\ntrue\neq\neq\nle\nge\nge\nle\ntrue", p.as_output());
+}
+
+#[test]
+fn if_tag_4() {
+    let mut p = Parser::new("test/if_tag/4/if.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("\nne\nne\nle\nlt\nlt\nle\ntrue\nne\nne\ngt\nge\nge\ngt\ntrue", p.as_output());
+}
+
+#[test]
+fn if_tag_5() {
+    let mut p = Parser::new("test/if_tag/5/if.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!(
+        "\nne\nne\ngt\nge\nge\ngt\ntrue\nnot-empty\nexists\nne\nne\nle\nlt\nlt\nle\nfalse\nnot-empty\nexists",
+        p.as_output()
+    );
+}
+
+#[test]
+fn if_tag_6() {
+    let mut p = Parser::new("test/if_tag/6/if.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!(
+        "\ntrue\nfalse\ntrue\ntrue",
+        p.as_output()
+    );
+}
+
+#[test]
 fn for_file_1() {
     let mut p = Parser::new("test/for_file/1/for.txt").unwrap();
     p.parse().unwrap();
