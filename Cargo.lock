@@ -19,7 +19,7 @@ checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
 
 [[package]]
 name = "arcana-core"
-version = "1.0.4"
+version = "1.1.0"
 dependencies = [
  "nfm-core",
  "serde_json",
@@ -27,7 +27,7 @@ dependencies = [
 
 [[package]]
 name = "arcc"
-version = "1.0.4"
+version = "1.1.0"
 dependencies = [
  "arcana-core",
  "serde",
