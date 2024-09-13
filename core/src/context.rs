@@ -586,7 +586,8 @@ impl JsonContext {
             else {
                 Ok(n.as_f64().unwrap() > 0_f64)
             }
-            JsonValue::String(_)|JsonValue::Object(_)|JsonValue::Array(_) => Ok(true),
+            JsonValue::Object(o) => Ok(o.keys().any(|_| true)),
+            JsonValue::String(_)|JsonValue::Array(_) => Ok(true),
         }
     }
 

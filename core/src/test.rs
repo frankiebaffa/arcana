@@ -471,6 +471,26 @@ fn if_tag_6() {
 }
 
 #[test]
+fn if_tag_7() {
+    let mut p = Parser::new("test/if_tag/7/if.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!(
+        "False",
+        p.as_output()
+    );
+}
+
+#[test]
+fn if_tag_8() {
+    let mut p = Parser::new("test/if_tag/8/if.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!(
+        "True",
+        p.as_output()
+    );
+}
+
+#[test]
 fn for_file_1() {
     let mut p = Parser::new("test/for_file/1/for.txt").unwrap();
     p.parse().unwrap();

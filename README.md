@@ -144,10 +144,11 @@ _sealed context_ prior to parsing the given file. Any output of this block will
 also be included in the _sealed context_ with the special `$content` _alias_.
 
 ```arcana
-&{pathlike}{
-    ={alias-1}{This is a property.}
-    ={alias-2}{This is another.}
-}
+&{pathlike}(
+    ={alias-1}("This is a property.")
+    ={alias-2}("This is another.")
+    Here is some content.
+)
 ```
 
 #### Modifiers
@@ -174,13 +175,13 @@ Can be used in conjunction with the _raw_ modifier.
 
 ```arcana
 %{alias}-
-{${alias}}-
-{Alias does not exist.}
+(${alias})-
+(Alias is falsey.)
 ```
 
 Evaluates the output of the condition as true or false. If true, the first
 trailing block is parsed. Else, the second trailing block is parsed. The default
-condition of the _if_ tag is _exists_. The initial _if_ tag as well as the
+condition of the _if_ tag is _truthy_. The initial _if_ tag as well as the
 _true_ condition tag can be optionally trailed by a _chain_ as shown above. The
 condition can be preceeded by the _not_ operator (`!`) to negate the evaluated
 condition.
@@ -188,7 +189,7 @@ condition.
 #### Exists
 
 ```arcana
-%{alias exists}{${alias}}{Alias does not exist.}
+%{alias exists}(${alias})(Alias does not exist.)
 ```
 
 Evaluates to true if the given _alias_ exists in the current _context_.
@@ -202,14 +203,46 @@ Evaluates to true if the given _alias_ exists in the current _context_.
 Evaluates to true if the given _alias_ has an empty value in the current
 _context_.
 
+#### Truthy
+
+```arcana
+%{this.alias}(Alias was true.)(Alias was false.)
+```
+
+Evaluates to true if the given _alias_ is truthy. A defined string will always
+be true. A number will be true when greater than 0. An array will always be
+true. An object will be evaluated based on whether or not it contains any keys.
+Null will always evaluate to false.
+
+#### Comparisons
+
+```arcana
+%{this.alias==that.alias}()
+%{this.alias>that.alias}()
+%{this.alias>=that.alias}()
+%{this.alias<that.alias}()
+%{this.alias<=that.alias}()
+```
+
+Evaluates the equality or comparison between two JSON objects. If the objects
+cannot be compared (string to number, etc), then an error will be thrown.
+
+#### Multiple Conditions
+
+```arcana
+%{this.alias&&this.alias>that.alias||$loop exists}()
+```
+
+Conditions can be chained together using `&&` for `and` and `||` for `or`.
+
 ### For-Each-Item
 
 ```arcana
-@{item in alias}{
+@{item in alias}(
     ${item.name}
-}{
+)(
     No items.
-}
+)
 ```
 
 Loop through contents of an array in _context_. The inner _context_ of the loop
@@ -241,16 +274,16 @@ This object's values are mapped to the following aliases.
 Treat the values found within the array as paths to files.
 
 ```arcana
-@{dir in alias|paths}{
-    *{file in dir|ext "json"}{
+@{dir in alias|paths}(
+    *{file in dir|ext "json"}(
         .{file|as subobj}
         ${subobj.description}
-    }{
+    )(
         No files in directory.
-    }
-}{
+    )
+)(
     No directories in alias.
-}
+)
 ```
 
 ##### Reverse
@@ -259,19 +292,19 @@ Reverse the order of the array.
 
 ```arcana
 @{item in alias|reverse}-
-{%{ !$loop.first }{
-}${ item }}-
-{No items.}
+(%{ !$loop.first }(
+)${ item })-
+(No items.)
 ```
 
 ### For-Each-File
 
 ```arcana
-*{file in pathlike}{
+*{file in pathlike}(
     &{item}
-}{
+)(
     No files in directory.
-}
+)
 ```
 
 Loop through the files found within a given directory. The inner context of the
@@ -287,11 +320,12 @@ The same loop context is set for this tag as for _for-each-item_.
 ##### With-Extension
 
 ```arcana
-*{file in pathlike|ext "arcana"}{
-    &{file}{
-        ={$loop}<{loop}
-    }
-}
+*{file in "./this/dir"|ext "json"}(
+    .{file|as sub}
+    *{sub-file in sub.files}(
+        \(${$loop.position}\) ${sub-file|filename}
+    )
+)
 ```
 
 Only include files with the matching extension.
@@ -299,11 +333,11 @@ Only include files with the matching extension.
 ##### Reverse
 
 ```arcana
-*{file in pathlike|ext "arcana"|reverse}{
+*{file in pathlike|ext "arcana"|reverse}(
     &{file}
-}{
+)(
     No files found in directory.
-}
+)
 ```
 
 Reverse the order of the files.
@@ -396,69 +430,79 @@ The output of the parser would be:
  Doe
 ```
 
+##### Json
+
+```arcana
+={item}("This string here.")
+={ctx.item}(${item|json})
+```
+
+Represents the content as raw json.
+
 ### Set-Item
 
 ```arcana
-={alias}{Here is the value}
+={alias}("Here is the value")
 ```
 
-Sets the value at _alias_ within the current _context_ to the _content_ of the
-block. This can also be used with other items in the _context_.
+Sets the value at _alias_ within the current _context_ to the parsed JSON output
+of the block.
+
+The block can contain arcana syntax as long as the parsed output is valid JSON.
 
 ```arcana
-={alias}{${item.name}}
+={this-name}(${item.name|json})
 ```
 
-#### Modifiers
-
-##### Array
-
-Initializes an array at _alias_ if it is not an already an array and pushes the
-given value into it.
+Any JSON type can be set using the _set-item_ block.
 
 ```arcana
-={alias|array}{First item}
+={this-object}({
+    "key": "value",
+    "items": [
+        "first",
+        "second",
+        "third"
+    ],
+    "a-number": 54.2
+})
 ```
 
-This modifier can also be chained together using chains or inline.
+The root context can also be written-to by avoiding the inclusion of an alias.
 
 ```arcana
-={alias|array}{First item}{Second item}-
-{Third item}{Fourth item}
+={}({
+    "root-level-item": "Some value."
+})
+${root-level-item}
 ```
 
-##### Path
-
-Sets _alias_ to a pathlike built from the output of the block.
-
-```arcana
-={alias|path}{path/to/file.txt}
-```
-
-#### Siphon-Item
+This comes in handy when an included file references an object from the root
+context and is accessed from within a loop or another context. Consider the
+following file `artist.arcana`:
 
 ```arcana
-={alias1}<{alias2}
-```
+# ${name}
 
-Sets _alias1_ to the literal json value found at _alias2_. This is useful when
-an entire object needs to be set at a different alias while including another
-template. The special `$root` alias can be used in the first position iff
-_alias2_ is a map and all of the keys are wished to be moved to the root of the
-current _context_.
+${brief}
 
-The following example utilizes the _siphon-item_ tag as well as the `$root`
-alias. If the file `album.arcana` is used both from another template as well as
-within a standalone template, it may only reference the properties within
-`album` at their root alias, i.e. `name`, instead of accessing them from a
-higher scoped alias such as `album.name`.
-
-```arcana
-@{album in artist.albums}{
-    &{"album.arcana"}{
-        ={$root}<{album}
+@{album in albums}(
+    &{"./album.arcana"}{
+        ={}(${album|json})
     }
-}
+)
+```
+
+The file considers the `artist` object to be at the root level. So if we wanted
+to include the file from another context, say `artists.arcana`, we could
+reference the artist as a root level object:
+
+```arcana
+@{artist in artists}(
+    &{"./artist.arcana"|md}(
+        ={}(${artist|json})
+    )
+)
 ```
 
 ### Unset Item
@@ -468,14 +512,4 @@ higher scoped alias such as `album.name`.
 ```
 
 Unsets the value at _alias_.
-
-#### Modifiers
-
-##### Pop
-
-Pops the last value off of the array.
-
-```arcana
-/{alias|pop}
-```
 
