@@ -1,5 +1,5 @@
-%{the-item}{
-	={{${the-item}}}=${name}
-}{
+%{the-item}(
+	={}(${the-item})${name}
+)(
 	No name.
-}
+)

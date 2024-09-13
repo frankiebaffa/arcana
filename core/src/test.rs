@@ -784,6 +784,7 @@ fn unset_item_1() {
 }
 
 #[test]
+#[should_panic]
 fn unset_item_2() {
     let mut p = Parser::new("test/unset_item/2/unset.arcana").unwrap();
     p.parse().unwrap();

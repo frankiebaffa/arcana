@@ -1,6 +1,6 @@
-={ obj.arr }{[
+={ obj.arr }([
 	"First",
 	"Second"
-]}=/{ obj.arr | pop }@{ item in obj.arr }-
-{%{ !$loop.first }{
-}${ item}}
+])/{ obj.arr | pop }@{ item in obj.arr }-
+(%{ !$loop.first }(
+)${ item})

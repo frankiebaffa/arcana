@@ -57,22 +57,17 @@ pub(crate)
 const SET_ITEM: &str = "={";
 
 pub(crate)
-const END_SET_ITEM: &str = "}=";
-
-pub(crate)
-const SET_JSON: &str = "={{";
-
-pub(crate)
-const END_SET_JSON: &str = "}}=";
-
-pub(crate)
 const UNSET_ITEM: &str = "/{";
 
 pub(crate)
-const ENDBLOCK: char = '}';
+const ENDTAG: char = '}';
 
 pub(crate)
 const CHAIN: char = '-';
 
 pub(crate)
-const STARTBLOCK: char = '{';
+const STARTBLOCK: char = '(';
+
+pub(crate)
+const ENDBLOCK: char = ')';
+

@@ -1,5 +1,5 @@
-={{{
+={}({
 	"object": {
 		"name": "An Object"
 	}
-}}}=${object}
+})${object}

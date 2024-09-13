@@ -1,22 +1,22 @@
-={{{
+={}({
 	"a": true,
 	"b": false
-}}}=
-%{a==b}{eq}{ne}
-%{a!=b}{ne}{eq}
-%{a>b}{gt}{le}
-%{a>=b}{ge}{lt}
-%{a<b}{lt}{ge}
-%{a<=b}{le}{gt}
-%{a}{true}{false}
-%{a empty}{empty}{not-empty}
-%{a exists}{exists}{not-exists}
-%{b==a}{eq}{ne}
-%{b!=a}{ne}{eq}
-%{b>a}{gt}{le}
-%{b>=a}{ge}{lt}
-%{b<a}{lt}{ge}
-%{b<=a}{le}{gt}
-%{b}{true}{false}
-%{b empty}{empty}{not-empty}
-%{b exists}{exists}{not-exists}
+})
+%{a==b}(eq)(ne)
+%{a!=b}(ne)(eq)
+%{a>b}(gt)(le)
+%{a>=b}(ge)(lt)
+%{a<b}(lt)(ge)
+%{a<=b}(le)(gt)
+%{a}(true)(false)
+%{a empty}(empty)(not-empty)
+%{a exists}(exists)(not-exists)
+%{b==a}(eq)(ne)
+%{b!=a}(ne)(eq)
+%{b>a}(gt)(le)
+%{b>=a}(ge)(lt)
+%{b<a}(lt)(ge)
+%{b<=a}(le)(gt)
+%{b}(true)(false)
+%{b empty}(empty)(not-empty)
+%{b exists}(exists)(not-exists)

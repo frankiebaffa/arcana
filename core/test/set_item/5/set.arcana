@@ -1,2 +1,2 @@
-={obj.value}{"This is the value"}=={obj.next}{${obj.value|json}}=${obj.next}
+={obj.value}("This is the value")={obj.next}(${obj.value|json})${obj.next}
 ${obj.value}

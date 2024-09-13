@@ -86,11 +86,6 @@ enum IfCondition {
     Truthy
 }
 
-#[derive(PartialEq)]
-enum UnsetItemMod {
-    Pop,
-}
-
 /// The parser for Arcana templates.
 #[derive(Debug)]
 pub
@@ -608,6 +603,8 @@ impl Parser {
             return Ok(false);
         }
 
+        const TAG_NAME: &str = "extends";
+
         let start = self.src().coord();
 
         // make sure that the file can still extend another
@@ -618,13 +615,13 @@ impl Parser {
 
         // check for unexpected eof
         self.unexpected_eof(|| Error::UnterminatedTag(
-            "extends".to_owned(), start, self.src().file().to_owned()
+            TAG_NAME.to_owned(), start, self.src().file().to_owned()
         ))?;
 
         // trim until the first characters
         self.src_mut().trim_start();
 
-        let path = self.pathlike("extends")?;
+        let path = self.pathlike(TAG_NAME)?;
         let path = self.normalize_path(path);
 
         // trim until the closing tag
@@ -632,11 +629,11 @@ impl Parser {
 
         // check for unexpected eof
         self.unexpected_eof(|| Error::UnterminatedTag(
-            "extends".to_owned(), start, self.src().file().to_owned()
+            TAG_NAME.to_owned(), start, self.src().file().to_owned()
         ))?;
 
-        if !self.src().pos().starts_with(consts::block::ENDBLOCK) {
-            return Err(self.illegal_character("extends"));
+        if !self.src().pos().starts_with(consts::block::ENDTAG) {
+            return Err(self.illegal_character(TAG_NAME));
         }
 
         self.src_mut().take(1);
@@ -651,6 +648,8 @@ impl Parser {
             return Ok(false);
         }
 
+        const TAG_NAME: &str = "source";
+
         let start = self.src().coord();
 
         // pass beginning tag
@@ -660,17 +659,17 @@ impl Parser {
         self.src_mut().trim_start();
 
         self.unexpected_eof(|| Error::UnterminatedTag(
-            "source".to_owned(),
+            TAG_NAME.to_owned(),
             start,
             self.src().file().to_owned(),
         ))?;
 
-        let path = self.pathlike("source")?;
+        let path = self.pathlike(TAG_NAME)?;
         let path = self.normalize_path(path);
 
         self.src_mut().trim_start();
         self.unexpected_eof(|| Error::UnterminatedTag(
-            "source".to_owned(),
+            TAG_NAME.to_owned(),
             start,
             self.src().file().to_owned(),
         ))?;
@@ -679,19 +678,19 @@ impl Parser {
             self.src_mut().take(1);
             self.src_mut().trim_start();
             self.unexpected_eof(|| Error::UnterminatedTag(
-                "source".to_owned(),
+                TAG_NAME.to_owned(),
                 start,
                 self.src().file().to_owned(),
             ))?;
 
             if !self.src().pos().starts_with(consts::modif::AS) {
-                return Err(self.illegal_character("source"));
+                return Err(self.illegal_character(TAG_NAME));
             }
 
             self.src_mut().take(consts::modif::AS.len());
             self.src_mut().trim_start();
             self.unexpected_eof(|| Error::UnterminatedTag(
-                "source".to_owned(),
+                TAG_NAME.to_owned(),
                 start,
                 self.src().file().to_owned(),
             ))?;
@@ -711,7 +710,7 @@ impl Parser {
             None
         };
 
-        if !self.src().pos().starts_with(consts::block::ENDBLOCK) {
+        if !self.src().pos().starts_with(consts::block::ENDTAG) {
             return Err(self.illegal_character("source"));
         }
 
@@ -917,7 +916,7 @@ impl Parser {
 
         let mods = self.include_content_mod(start)?;
 
-        if !self.src().pos().starts_with(consts::block::ENDBLOCK) {
+        if !self.src().pos().starts_with(consts::block::ENDTAG) {
             return Err(self.illegal_character("include-content"));
         }
 
@@ -1156,7 +1155,7 @@ impl Parser {
             false
         };
 
-        if !self.src().pos().starts_with(consts::block::ENDBLOCK) {
+        if !self.src().pos().starts_with(consts::block::ENDTAG) {
             return Err(self.illegal_character(TAG_NAME));
         }
 
@@ -1411,7 +1410,7 @@ impl Parser {
             }
         }
 
-        if !self.src().pos().starts_with(consts::block::ENDBLOCK) {
+        if !self.src().pos().starts_with(consts::block::ENDTAG) {
             return Err(self.illegal_character("if"));
         }
 
@@ -1520,17 +1519,6 @@ impl Parser {
         Ok(Some(mods))
     }
 
-    fn pop_value<A>(&mut self, alias: A) -> Result<()>
-    where
-        A: Into<Alias>
-    {
-        if let Some(ctx) = self.ctx_mut() {
-            ctx.pop_stringlike(alias)?;
-        }
-
-        Ok(())
-    }
-
     fn set_json_value<A>(&mut self, alias: A, val: JsonValue) -> Result<()>
     where
         A: Into<Alias>
@@ -1618,7 +1606,7 @@ impl Parser {
         self.src_mut().trim_start();
         unexpected_eof_for(self, start)?;
 
-        if !self.src().pos().starts_with(consts::block::ENDBLOCK) {
+        if !self.src().pos().starts_with(consts::block::ENDTAG) {
             return Err(self.illegal_character(TAG_NAME));
         }
 
@@ -1847,6 +1835,16 @@ impl Parser {
 
         let alias = self.alias(TAG_NAME)?;
 
+        self.src_mut().trim_start();
+        unexpected_eof_for(self, start)?;
+
+        // take "in"
+        self.in_keyword(TAG_NAME)?;
+        unexpected_eof_for(self, start)?;
+
+        let in_alias = self.alias(TAG_NAME)?;
+        self.src_mut().trim_start();
+
         let nullable = if self.src().pos().starts_with(consts::exp::NULLABLE) {
             self.src_mut().take(1);
             true
@@ -1858,18 +1856,11 @@ impl Parser {
         self.src_mut().trim_start();
         unexpected_eof_for(self, start)?;
 
-        // take "in"
-        self.in_keyword(TAG_NAME)?;
-        unexpected_eof_for(self, start)?;
-
-        let in_alias = self.alias(TAG_NAME)?;
-
-        self.src_mut().trim_start();
         let mods = self.for_item_mods(start)?;
         self.src_mut().trim_start();
         unexpected_eof_for(self, start)?;
 
-        if !self.src().pos().starts_with(consts::block::ENDBLOCK) {
+        if !self.src().pos().starts_with(consts::block::ENDTAG) {
             return Err(self.illegal_character(TAG_NAME));
         }
 
@@ -2014,10 +2005,6 @@ impl Parser {
     fn set_json(&mut self, bypass: bool) -> Result<bool> {
         const TAG_NAME: &str = "set-json";
 
-        if !self.src().pos().starts_with(consts::block::SET_JSON) {
-            return Ok(false);
-        }
-
         fn unexpected_eof(p: &mut Parser, coord: Coordinate) -> Result<()> {
             p.unexpected_eof(|| Error::UnterminatedTag(
                 TAG_NAME.to_owned(),
@@ -2027,16 +2014,21 @@ impl Parser {
         }
 
         let start = self.src().coord();
-        self.src_mut().take(consts::block::SET_JSON.len());
+
+        if !self.src().pos().starts_with(consts::block::STARTBLOCK) {
+            return Err(self.illegal_character(TAG_NAME));
+        }
+
+        self.src_mut().take(1);
         unexpected_eof(self, start)?;
 
         let output = self.spawn_sealed_internal_parser(|p| {
-            while !p.src().eof() && !p.src().pos().starts_with(consts::block::END_SET_JSON) {
+            while !p.src().eof() && !p.src().pos().starts_with(consts::block::ENDBLOCK) {
                 p.parse_next(bypass)?;
             }
 
             unexpected_eof(p, start)?;
-            p.src_mut().take(consts::block::END_SET_JSON.len());
+            p.src_mut().take(1);
             Ok(())
         })?;
 
@@ -2076,12 +2068,19 @@ impl Parser {
         let start = self.src().coord();
         unexpected_eof(self, start)?;
 
+        // no alias, set json as root
+        if self.src().pos().starts_with(consts::block::ENDTAG) {
+            self.src_mut().take(1);
+            self.set_json(bypass)?;
+            return Ok(true);
+        }
+
         let alias = self.alias(TAG_NAME)?;
 
         self.src_mut().trim_start();
         unexpected_eof(self, start)?;
 
-        if !self.src().pos().starts_with(consts::block::ENDBLOCK) {
+        if !self.src().pos().starts_with(consts::block::ENDTAG) {
             return Err(self.illegal_character(TAG_NAME));
         }
 
@@ -2098,12 +2097,12 @@ impl Parser {
         self.chain_start(TAG_NAME, start)?;
 
         let output = self.spawn_sealed_internal_parser(|p| {
-            while !p.src().eof() && !p.src().pos().starts_with(consts::block::END_SET_ITEM) {
+            while !p.src().eof() && !p.src().pos().starts_with(consts::block::ENDBLOCK) {
                 p.parse_next(bypass)?;
             }
 
             unexpected_eof(p, start)?;
-            p.src_mut().take(consts::block::END_SET_ITEM.len());
+            p.src_mut().take(1);
             Ok(())
         })?;
 
@@ -2146,40 +2145,13 @@ impl Parser {
         self.src_mut().trim_start();
         unexpected_eof(self, start)?;
 
-        let mut mods = Vec::new();
-
-        while self.src().pos().starts_with(consts::block::MODIFIER) {
-            self.src_mut().take(1);
-            self.src_mut().trim_start();
-            unexpected_eof(self, start)?;
-
-            if self.src().pos().starts_with(consts::modif::POP) {
-                self.src_mut().take(consts::modif::POP.len());
-                mods.push(UnsetItemMod::Pop);
-            }
-            else {
-                return Err(self.illegal_character(TAG_NAME));
-            }
-
-            self.src_mut().trim_start();
-        }
-
-        unexpected_eof(self, start)?;
-
-        if !self.src().pos().starts_with(consts::block::ENDBLOCK) {
+        if !self.src().pos().starts_with(consts::block::ENDTAG) {
             return Err(self.illegal_character(TAG_NAME));
         }
 
         self.src_mut().take(1);
 
-        let is_pop = mods.iter().any(|v| v.eq(&UnsetItemMod::Pop));
-
-        if is_pop {
-            self.pop_value(alias)?;
-        }
-        else {
-            self.remove_value(alias);
-        }
+        self.remove_value(alias);
 
         Ok(true)
     }
@@ -2197,15 +2169,8 @@ impl Parser {
     }
 
     fn parse_next(&mut self, bypass: bool) -> Result<()> {
-        // is escaped (3 char pattern)
-        if self.src().pos().starts_with(consts::block::esc::SET_JSON)
-        {
-            self.src_mut().take(consts::block::esc::ESCAPE.len());
-            let taken = self.src_mut().take(3).unwrap();
-            self.output.push_str(&taken);
-        }
         // is escaped (2 char pattern)
-        else if self.src().pos().starts_with(consts::block::esc::MODIFIER) ||
+        if self.src().pos().starts_with(consts::block::esc::MODIFIER) ||
             self.src().pos().starts_with(consts::block::esc::IGNORE) ||
             self.src().pos().starts_with(consts::block::esc::COMMENT) ||
             self.src().pos().starts_with(consts::block::esc::EXTENDS) ||
@@ -2222,7 +2187,9 @@ impl Parser {
         }
         // is escaped (1 char pattern)
         else if self.src().pos().starts_with(consts::block::esc::BLOCK) ||
-            self.src().pos().starts_with(consts::block::esc::ENDBLOCK)
+            self.src().pos().starts_with(consts::block::esc::ENDBLOCK) ||
+            self.src().pos().starts_with(consts::block::esc::TAG) ||
+            self.src().pos().starts_with(consts::block::esc::ENDTAG)
         {
             self.esc_endblock();
         }
@@ -2244,8 +2211,6 @@ impl Parser {
             self.for_file(bypass)? ||
             // is for-item
             self.for_item(bypass)? ||
-            // is set-json
-            self.set_json(bypass)? ||
             // is set-item
             self.set_item(bypass)? ||
             // is remove-item

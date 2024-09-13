@@ -1,5 +1,5 @@
-%{the-item}{
-		={{${the-item|json}}}=${name}
-}{
+%{the-item}(
+		={}(${the-item|json})${name}
+)(
 	No name.
-}
+)

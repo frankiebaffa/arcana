@@ -1,1 +1,1 @@
-@{item? in items}{%{!$loop.first}{, }${item.name}}
+@{item in items?}(%{!$loop.first}(, )${item.name})

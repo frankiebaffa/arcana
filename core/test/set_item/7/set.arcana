@@ -1,4 +1,4 @@
-.{"ctx.json"}={{
+.{"ctx.json"}={}(
 	${obj|json}
-}}=${value}
+)${value}
 ${obj.value}

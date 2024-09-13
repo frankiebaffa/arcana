@@ -1,4 +1,4 @@
 &{ "include.arcana" }-
-{={ internalvalue }{"This is the internal value."}=This is the content.}
+(={ internalvalue }("This is the internal value.")This is the content.)
 ${ internalvalue? }
 ${ $content? }

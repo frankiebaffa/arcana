@@ -323,42 +323,6 @@ impl JsonContext {
         Ok(())
     }
 
-    pub(crate)
-    fn pop_stringlike<A>(&mut self, alias: A) -> Result<()>
-    where
-        A: Into<Alias>
-    {
-        let a: Alias =  alias.into();
-
-        let mut value = &mut self.properties;
-        let len = a.scope.len();
-        for (idx, seg) in a.iter().enumerate() {
-            // not the last iteration, make sure the segment is an object
-            if idx != len - 1 {
-                // if the value is not an object
-                if !matches!(value.get(&seg.segment), Some(JsonValue::Object(_))) {
-                    return Ok(());
-                }
-
-                value = value.get_mut(&seg.segment).unwrap();
-            }
-            // last iteration, pop the value
-            else {
-                if !matches!(value.get(&seg.segment), Some(JsonValue::Array(_))) {
-                    return Ok(());
-                }
-
-                value.get_mut(&seg.segment).unwrap().as_array_mut()
-                    .unwrap()
-                    .pop();
-
-                break;
-            }
-        }
-
-        Ok(())
-    }
-
     fn get_internal<A: Into<Alias>>(&self, alias: A) -> Result<(&JsonValue, PathBuf)> {
         // default scoped path
         let mut path = self.scoped_paths.get(&Alias::default());

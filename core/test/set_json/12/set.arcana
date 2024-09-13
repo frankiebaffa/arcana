@@ -1,11 +1,11 @@
-={{{
+={}({
 	"obj": {
 		"value": "This is the value"
 	}
-}}}=={{{
+})={}({
 	"obj": {
 		"next": "${obj.value}",
 		"value": "${obj.value}"
 	}
-}}}=${obj.next}
+})${obj.next}
 ${obj.value}

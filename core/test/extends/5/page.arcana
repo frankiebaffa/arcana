@@ -1,2 +1,2 @@
 .{ "ctx.json" }+{ template }@{ ctx in contexts | paths }-
-{.{ ctx }}
+(.{ ctx })

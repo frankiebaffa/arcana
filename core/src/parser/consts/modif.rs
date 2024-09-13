@@ -48,9 +48,6 @@ pub(crate)
 const PATH: &str = "path";
 
 pub(crate)
-const POP: &str = "pop";
-
-pub(crate)
 const TRIM: &str = "trim";
 
 pub(crate)

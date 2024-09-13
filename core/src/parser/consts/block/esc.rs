@@ -46,13 +46,16 @@ pub(crate)
 const SET_ITEM: &str = "\\={";
 
 pub(crate)
-const SET_JSON: &str = "\\={{";
-
-pub(crate)
 const UNSET_ITEM: &str = "\\/{";
 
 pub(crate)
-const BLOCK: &str = "\\{";
+const TAG: &str = "\\{";
 
 pub(crate)
-const ENDBLOCK: &str = "\\}";
+const ENDTAG: &str = "\\}";
+
+pub(crate)
+const BLOCK: &str = "\\(";
+
+pub(crate)
+const ENDBLOCK: &str = "\\)";

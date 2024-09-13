@@ -1,22 +1,22 @@
-={{{
+={}({
 	"a": {
 		"number": 4
 	},
 	"b": {
 		"number": 4
 	}
-}}}=
-%{a.number==b.number}{eq}{ne}
-%{a.number!=b.number}{ne}{eq}
-%{a.number>b.number}{gt}{le}
-%{a.number>=b.number}{ge}{lt}
-%{a.number<b.number}{lt}{ge}
-%{a.number<=b.number}{le}{gt}
-%{a.number}{true}{false}
-%{b.number==a.number}{eq}{ne}
-%{b.number!=a.number}{ne}{eq}
-%{b.number>a.number}{gt}{le}
-%{b.number>=a.number}{ge}{lt}
-%{b.number<a.number}{lt}{ge}
-%{b.number<=a.number}{le}{gt}
-%{b.number}{true}{false}
+})
+%{a.number==b.number}(eq)(ne)
+%{a.number!=b.number}(ne)(eq)
+%{a.number>b.number}(gt)(le)
+%{a.number>=b.number}(ge)(lt)
+%{a.number<b.number}(lt)(ge)
+%{a.number<=b.number}(le)(gt)
+%{a.number}(true)(false)
+%{b.number==a.number}(eq)(ne)
+%{b.number!=a.number}(ne)(eq)
+%{b.number>a.number}(gt)(le)
+%{b.number>=a.number}(ge)(lt)
+%{b.number<a.number}(lt)(ge)
+%{b.number<=a.number}(le)(gt)
+%{b.number}(true)(false)

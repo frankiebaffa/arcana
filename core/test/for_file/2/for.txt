@@ -1,4 +1,4 @@
-.{ "ctx.json" }*{ item_1 in i1 }{%{ !$loop.first}{
-}*{ item_2 in i2 }{%{ !$loop.first }{
-}&{ item_1 }: &{ item_2 }}}
+.{ "ctx.json" }*{ item_1 in i1 }(%{ !$loop.first}(
+)*{ item_2 in i2 }(%{ !$loop.first }(
+)&{ item_1 }: &{ item_2 }))
 End.
