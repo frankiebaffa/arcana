@@ -1,0 +1,4 @@
+={}({
+	"include": "./included.arcana"
+})\
+&{"${include}"}(={text}("included"))

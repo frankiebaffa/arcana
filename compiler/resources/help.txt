@@ -1,46 +1,24 @@
 arcc: The compiler for the Arcana Templating Engine.
 
 BRIEF
-  The arcc program can run a series of deployment actions defined within a json
-  file as well as deployment actions passed as arguments. Each of these
-  deployment actions can also be reversed with the --clean argument. For
-  example, a single file can be compiled using the following command:
-
-    arcc --compile-file --source /path/to/file.arcana \
-      --destination /path/to/output.html
-
-  Adding the --clean switch to this command will "clean" the previous results
-  by deleting the file at "/path/to/output.html".
+  The arcc program will parse and compile a template passed as a path, string,
+  or defined interactively.
 
 USAGE
+  arcc <PATH>
   arcc -h
+  arcc -i
   arcc -l
   arcc -L
-  arcc -s
-  arcc [-v] [-c] <deployment>
-  arcc [-v] [-c] [-a...] [-d...] [-f...] [-i...] [-r...]
+  arcc -s <STRING>
   arcc -V
 
 ARGUMENTS
-  -a  --compile-against    ...  Compiles a single template against one or
-                                multiple contexts.
-  -c  --clean                   Cleans all files from output based on
-                                deployment.
-  -d  --compile-directory  ...  Compile all templates in the given directory,
-                                optionally with the matching extensions, and
-                                output to the given directory, optionally with a
-                                given extension.
-  -e  --delete-file        ...  Delete a file or multiple files.
-  -f  --compile-file       ...  Compile a single template and output to a
-                                directory.
-  -h  --help                    Displays this help message.
-  -i  --copy-file          ...  Copy a file.
-  -l  --license-notice          Displays the license notice.
-  -L  --license                 Displays the full license.
-  -r  --copy-directory     ...  Copy files within a directory.
-  -s  --schema                  Prints the .json schema file for deployments.
-  -v  --verbose                 Prints verbose information while running.
-  -V  --version                 Prints the version.
-
-POSITIONALS
-  <deployment>  The path to the deployment to execute.
+                        <PATH>    Parse the file at <PATH> as a template.
+  -h  --help                      Display this help message.
+  -i  --interactive               Accept input until EOL, then parse input as a
+                                  template.
+  -l  --license-notice            Display the license notice.
+  -L  --license                   Display the full license.
+  -s  --from-string     <STRING>  Parse <STRING> as a template.
+  -V  --version                   Display the version number.

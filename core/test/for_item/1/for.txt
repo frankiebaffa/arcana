@@ -1,5 +1,5 @@
-.{ "ctx.json" }@{ item in items }-
+.{ "ctx.json" }@{ item in items }\
 (%{ !$loop.first }(
-)${ item })-
+)${ item })\
 (No items.)
 End.

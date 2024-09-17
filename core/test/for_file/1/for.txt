@@ -1,5 +1,5 @@
-*{ item in "items" | ext "txt" }-
+*{ item in "items" | ext "txt" }\
 (%{ !$loop.first }(
-)&{item})-
+)&{item})\
 (No items.)
 End.

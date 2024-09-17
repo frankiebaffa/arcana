@@ -1,0 +1,5 @@
+.{"./ctx.json"}\
+@{item in items}(\
+	%{!$loop.first}(, )\
+	${item.name}\
+)

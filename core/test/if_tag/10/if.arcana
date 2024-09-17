@@ -1,0 +1,4 @@
+This\
+%{!$loop}\
+( is not a loop)\
+.

@@ -1,0 +1,4 @@
+*{file in "./files"|files}(\
+	%{!$loop.first}(, )\
+	&{file}\
+).

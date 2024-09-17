@@ -1,0 +1,31 @@
+- [ ] Unify "types"
+    - **Path**
+        - A path to a file encapsulated with quotes.
+        - _ex_ `"here/is/a/file.txt"`
+    - **Alias**
+        - An alias of a value in context where the name is at least 1
+        character, begins with `[a-zA-Z\$]`, and contains `[a-zA-Z0-9.\-_]`.
+        - _ex_ `this.value`
+        - _ex_ `$loop.position`
+        - _ex_ `this-value1`
+        - _ex_ `that_value2`
+        - _**NOT**_ `0thatvalue`
+        - _**NOT**_ `this$value`
+    - **JsonValue**
+        - A json value encapsulated with backticks.
+        - _ex_ ``{"an": "object"}``
+        - _ex_ ``["an", "array"}``
+        - _ex_ ``"A string"``
+        - _ex_ ``42``
+        - _ex_ ``[{"an": "array"}, {"of": "objects"}]``
+        - _ex_ ``null``
+        - _ex_ ``true``
+        - _**NOT**_ ``here is a string.``
+    - **AliasLike**
+        - An alias of a value in context or a json value.
+        - _ex_ An **Alias**
+        - _ex_ A **JsonValue**
+    - **PathLike**
+        - A type which resolves to a **Path**.
+        - _ex_ A **Path**.
+        - _ex_ An **AliasLike** resolving to a path.

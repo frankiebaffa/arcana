@@ -1,0 +1,3 @@
+.{"./ctx.json"}\
+NAME: ${name}
+DATE: ${date}

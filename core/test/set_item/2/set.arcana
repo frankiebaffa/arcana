@@ -3,6 +3,6 @@
 	"Second",
 	"Third",
 	"Fourth"
-])@{ item in obj.arr }-
+])@{ item in obj.arr }\
 (%{ !$loop.first }(
 )${ item })

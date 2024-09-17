@@ -1,2 +1,2 @@
-={obj.path}-
+={obj.path}\
 ("path/to/file.txt")${obj.path|path}

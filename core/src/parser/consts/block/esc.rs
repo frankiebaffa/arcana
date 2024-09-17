@@ -16,13 +16,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub(crate)
-const ESCAPE: &str = "\\";
-
-pub(crate)
 const MODIFIER: &str = "\\|";
-
-pub(crate)
-const IGNORE: &str = "\\!{";
 
 pub(crate)
 const COMMENT: &str = "\\#{";
@@ -47,6 +41,15 @@ const SET_ITEM: &str = "\\={";
 
 pub(crate)
 const UNSET_ITEM: &str = "\\/{";
+
+pub(crate)
+const DELETE_PATH: &str = "\\-{";
+
+pub(crate)
+const COPY_PATH: &str = "\\~{";
+
+pub(crate)
+const WRITE_CONTENT: &str = "\\^{";
 
 pub(crate)
 const TAG: &str = "\\{";

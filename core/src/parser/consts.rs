@@ -27,6 +27,12 @@ pub(crate)
 const PATH: &str = "\"";
 
 pub(crate)
+mod esc {
+    pub(crate)
+    const PATH: &str = "\\\"";
+}
+
+pub(crate)
 const CONTENT: &str = "$content";
 
 pub(crate)

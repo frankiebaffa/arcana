@@ -1,0 +1,4 @@
+*{file in "./items"|dirs}(\
+	%{!$loop.first}(, )\
+	${$loop.entry.name}\
+)

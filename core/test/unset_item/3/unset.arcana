@@ -2,6 +2,6 @@
 	"First",
 	"Second",
 	"Third"
-])/{ obj.array }@{ item in obj.array? }-
+])/{ obj.array }@{ item in obj.array? }\
 (%{ !$loop.first}(
 )${ item })

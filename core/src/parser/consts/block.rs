@@ -21,12 +21,6 @@ pub(crate)
 const MODIFIER: char = '|';
 
 pub(crate)
-const IGNORE: &str = "!{";
-
-pub(crate)
-const ENDIGNORE: &str = "}!";
-
-pub(crate)
 const EXTENDS: &str = "+{";
 
 pub(crate)
@@ -60,10 +54,22 @@ pub(crate)
 const UNSET_ITEM: &str = "/{";
 
 pub(crate)
+const DELETE_PATH: &str = "-{";
+
+pub(crate)
+const COPY_PATH: &str = "~{";
+
+pub(crate)
+const WRITE_CONTENT: &str = "^{";
+
+pub(crate)
 const ENDTAG: char = '}';
 
 pub(crate)
-const CHAIN: char = '-';
+const TRIM_LF: &str = "\\\n";
+
+pub(crate)
+const TRIM: char = '\\';
 
 pub(crate)
 const STARTBLOCK: char = '(';

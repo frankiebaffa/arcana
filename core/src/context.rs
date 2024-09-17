@@ -290,7 +290,7 @@ impl JsonContext {
     }
 
     pub(crate)
-    fn set_value<A>(&mut self, alias: A, val: JsonValue) -> Result<()>
+    fn set_value<A>(&mut self, alias: A, set_from_dir: PathBuf, val: JsonValue) -> Result<()>
     where
         A: Into<Alias>
     {
@@ -316,6 +316,7 @@ impl JsonContext {
             else {
                 value.as_object_mut().unwrap()
                     .insert(seg.segment.to_owned(), val);
+                self.scoped_paths.insert(a, set_from_dir);
                 break;
             }
         }
@@ -361,8 +362,7 @@ impl JsonContext {
         if let Some(inner_alias) = inner_alias {
             let mut new = self.clone();
             let inner = inner_alias.into();
-            new.set_value(inner.clone(), value.clone())?;
-            new.scoped_paths.insert(inner.clone(), path);
+            new.set_value(inner.clone(), path, value.clone())?;
             return Ok(new);
         }
 
@@ -391,8 +391,7 @@ impl JsonContext {
                 return a.clone().into_iter()
                     .map(|v| {
                         let mut new = self.clone();
-                        new.set_value(inner.clone(), v)?;
-                        new.scoped_paths.insert(inner.clone(), path.clone());
+                        new.set_value(inner.clone(), path.clone(), v)?;
                         Ok(new)
                     })
                     .collect::<Result<Vec<Self>>>();
@@ -426,6 +425,7 @@ impl JsonContext {
         self.get_internal(alias).map(|v| v.0)
     }
 
+    pub(crate)
     fn normalize_path(mut base: PathBuf, path: PathBuf) -> PathBuf {
         if path.is_absolute() {
             return path;

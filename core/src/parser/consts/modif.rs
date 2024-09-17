@@ -21,6 +21,12 @@ pub(crate)
 const EXT: &str = "ext";
 
 pub(crate)
+const FILES: &str = "files";
+
+pub(crate)
+const DIRS: &str = "dirs";
+
+pub(crate)
 const FILENAME: &str = "filename";
 
 pub(crate)

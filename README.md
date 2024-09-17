@@ -11,6 +11,9 @@ cargo install --path compiler
 arcc -h
 ```
 
+See the [help](https://raw.githubusercontent.com/frankiebaffa/arcana/master/compiler/resources/help.txt)
+document for the usage of the compiler.
+
 ## Glossary
 
 **alias:** A reference to a value within the current _context_ (i.e.
@@ -32,14 +35,25 @@ level.
 
 **stringlike:** A string, number, or boolean in the current _context_.
 
+## Whitespace Control
+
+```arcana
+This is an example \
+    of whitespace control.
+```
+
+Arcana has one mode of whitespace control, a single backslash ending a line.
+The parser will ignore the backslash and consume all following whitespace
+without dumping to _content_. The above example would compile to the following.
+
+```arcana
+This is an example of whitespace control.
+```
+
 ## Tags
 
-Expression tags control the flow of the document and typically conform to the
-following pattern:
-
-```txt
-<EXP>{\s*<PATHORALIAS>\s*[|<MOD>[\s*<MODARGS>]*]*\s*}
-```
+Expression tags can control the flow of the document, spawn other parsers, and
+can write content to other files.
 
 ### Comment
 
@@ -47,8 +61,7 @@ following pattern:
 #{This is a comment.}#
 ```
 
-Comments are ignored by the parser. If a comment is followed by a trailing
-line-break, it will also be ignored. Comments are closed with a special endblock
+Comments are ignored by the parser. Comments are closed with a special endblock
 so they can span multiple lines and contain the templating syntax without
 prematurely closing.
 
@@ -56,27 +69,6 @@ prematurely closing.
 #{ Uncomment in production
 ${alias}
 }#
-```
-
-### Ignore
-
-```arcana
-!{This file is ignored.}!
-```
-
-Disregards anything following the tag. The inner content of this block is
-ignored, but is useful for placing the reason why the file is ignored. Ignores
-are closed with a special endblock so they can span multiple lines and contain
-the templating syntax without prematurely closing.
-
-```arcana
-!{ File is not yet ready.
-@{file in files}{
-    &{file.path}{
-        ={$root}<{file.content}
-    }
-}
-}!
 ```
 
 ### Extend-Template
@@ -143,12 +135,38 @@ An optional block can be included which will allow for modifications to the
 _sealed context_ prior to parsing the given file. Any output of this block will
 also be included in the _sealed context_ with the special `$content` _alias_.
 
+Consider the following file `link.arcana`.
+
 ```arcana
-&{pathlike}(
-    ={alias-1}("This is a property.")
-    ={alias-2}("This is another.")
-    Here is some content.
-)
+<a href="${href}"%{cls}( class="${cls}")">${$content}</a>
+```
+
+It can be included in another template like so:
+
+```arcana
+<p>Click &{"./link.arcana"}(\
+    ={}({
+        "href": "https://github.com",
+        "cls": "a-link"
+    })\
+    Here\
+)</p>
+```
+
+Or without the JSON literal block:
+
+```arcana
+<p>Click &{"./link.arcana"}(\
+    ={href}("https://github.com")\
+    ={cls}("a-link")\
+    Here\
+)</p>
+```
+
+Either of these templates would compile to the following:
+
+```arcana
+<p>Click <a href="https://github.com" class="a-link">Here</a></p>
 ```
 
 #### Modifiers
@@ -513,3 +531,64 @@ reference the artist as a root level object:
 
 Unsets the value at _alias_.
 
+## File Operation Tags
+
+The following tags perform file operations and are intended for deployment
+purposes. If you're feeling a bit _nutty_, you can use them in your standard
+templates however you wish.
+
+### Write-Content
+
+```arcana
+^{pathlike}(\
+    &{"this/file.arcana"}(={title}("A title here"))\
+)
+```
+
+Writes to _pathlike_ the _content_ of the block.
+
+### Copy-Path
+
+```arcana
+~{source-pathlike destination-pathlike}
+```
+
+Copies the file at the source _pathlike_ to the file at the destination
+_pathlike_.
+
+### Delete-Path
+
+```arcana
+-{pathlike}
+```
+
+Deletes the file at _pathlike_.
+
+### Example
+
+Using the file operation tags, you can write your own logging deployment files
+like the following.
+
+```arcana
+#{ ./deploy.arcana }#\
+={font-file}("./in/font.ttf")\
+={font-dest}("./out/fonts/font.ttf")\
+Copying font "${font-file|path}" to "${font-dest|path}"\
+~{font-file font-dest}
+Compiling templates...\
+*{template in "./in/templates"|files|ext "arcana"}(
+    ={template-dest}("./out/${$loop.entry.stem}.html")\
+    Compiling "${template|path}" to "${template-dest|path}"\
+    ^{template-dest}(&{template})\
+)\
+```
+
+Running the `arcc ./deploy.arcana` command would output the following while also
+properly deploying the files.
+
+```txt
+Compiling font "./in/font.ttf" to "./out/fonts/font.ttf"
+Compiling templates...
+    Compiling "./in/templates/first.arcana" to "./out/first.html"
+    Compiling "./in/templates/second.arcana" to "./out/second.html"
+```

@@ -1,4 +1,4 @@
 		<ul>
-*{ item in "items" | ext "html" }(%{ !$loop.first }(
+*{ item in "items" | ext "html" | files }(%{ !$loop.first }(
 )			<li>&{ item }</li>)(<li>No items.</li>)
 		</ul>

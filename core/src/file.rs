@@ -164,16 +164,6 @@ impl Source {
     }
 
     pub(crate)
-    fn force_eof(&mut self) {
-        if self.eof() {
-            return;
-        }
-
-        self.coord.line = self.content.len() - 1;
-        self.coord.position = self.content[self.coord.line].len();
-    }
-
-    pub(crate)
     fn skip_internal(&mut self) -> Option<char> {
         // still characters to read
         if !self.eof() {

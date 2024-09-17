@@ -1,0 +1,1 @@
+*{file in "./items"|files}(${$loop.entry.stem}.${$loop.entry.ext})

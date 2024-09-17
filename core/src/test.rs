@@ -112,7 +112,7 @@ fn json_context_3() {
     map.as_object_mut().unwrap().insert("first".to_owned(), JsonValue::String("value".to_owned()));
     map.as_object_mut().unwrap().insert("second".to_owned(), JsonValue::String("value".to_owned()));
     for (k, v) in map.as_object().unwrap().into_iter() {
-        ctx.set_value(k, v.to_owned()).unwrap();
+        ctx.set_value(k, "/file.txt".into(), v.to_owned()).unwrap();
     }
 
     assert_eq!("value", ctx.get_stringlike("first").unwrap());
@@ -169,29 +169,6 @@ fn parser_2() {
     let ctx = p.ctx().as_ref().unwrap();
     let name = ctx.get("name").unwrap();
     assert_eq!("A name", name.as_str().unwrap());
-}
-
-#[test]
-fn ignore_1() {
-    let mut p = Parser::new("test/ignore/1/ignore.txt").unwrap();
-    p.parse().unwrap();
-    assert_eq!("", p.as_output());
-}
-
-#[test]
-fn ignore_2() {
-    let mut p = Parser::new("test/ignore/2/ignore.txt").unwrap();
-    match p.parse() {
-        Ok(_) => panic!("Test should have panicked!"),
-        Err(e) => match e {
-            Error::UnterminatedTag(name, c, _) => {
-                assert_eq!("ignore", name);
-                assert_eq!(c.line(), 0);
-                assert_eq!(c.position(), 0);
-            },
-            _ => panic!("Error should have been IgnoreTagNotEnded"),
-        },
-    }
 }
 
 #[test]
@@ -416,6 +393,16 @@ fn include_file_3() {
 }
 
 #[test]
+fn include_file_4() {
+    let mut p = Parser::new("test/include_file/4/include-file.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!(
+        "This file is included.",
+        p.as_output()
+    );
+}
+
+#[test]
 fn if_tag_1_if() {
     let mut p = Parser::new("test/if_tag/1/if.txt").unwrap();
     p.parse().unwrap();
@@ -491,6 +478,27 @@ fn if_tag_8() {
 }
 
 #[test]
+fn if_tag_9() {
+    let mut p = Parser::new("test/if_tag/9/if.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("This.", p.as_output());
+}
+
+#[test]
+fn if_tag_10() {
+    let mut p = Parser::new("test/if_tag/10/if.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("This is not a loop.", p.as_output());
+}
+
+#[test]
+fn if_tag_11() {
+    let mut p = Parser::new("test/if_tag/11/if.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("This is not a loop.", p.as_output());
+}
+
+#[test]
 fn for_file_1() {
     let mut p = Parser::new("test/for_file/1/for.txt").unwrap();
     p.parse().unwrap();
@@ -509,6 +517,27 @@ fn for_file_2() {
         ),
         p.as_output(),
     );
+}
+
+#[test]
+fn for_file_3() {
+    let mut p = Parser::new("test/for_file/3/for-file.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("First, Second, Third.", p.as_output());
+}
+
+#[test]
+fn for_file_4() {
+    let mut p = Parser::new("test/for_file/4/for-file.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("test.txt", p.as_output());
+}
+
+#[test]
+fn for_file_5() {
+    let mut p = Parser::new("test/for_file/5/for-file.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("sub1, sub2, sub3", p.as_output());
 }
 
 #[test]
@@ -534,6 +563,13 @@ fn for_item_3() {
     let mut p2 = Parser::new("test/for_item/3/two.arcana").unwrap();
     p2.parse().unwrap();
     assert_eq!("", p2.as_output());
+}
+
+#[test]
+fn for_item_4() {
+    let mut p = Parser::new("test/for_item/4/for-item.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("First, Second, Third", p.as_output());
 }
 
 #[test]
@@ -815,5 +851,86 @@ fn unset_item_2() {
 fn unset_item_3() {
     let mut p = Parser::new("test/unset_item/3/unset.arcana").unwrap();
     p.parse().unwrap();
+    assert_eq!("", p.as_output());
+}
+
+#[test]
+fn unset_item_4() {
+    let mut p = Parser::new("test/unset_item/4/unset.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!("", p.as_output());
+}
+
+#[test]
+fn delete_path_1() {
+    let path: PathBuf = "test/delete_path/1/delete-this.txt".into();
+    std::fs::write(&path, &[0x00]).unwrap();
+    assert!(path.exists());
+
+    let mut p = Parser::new("test/delete_path/1/delete.arcana").unwrap();
+    p.parse().unwrap();
+
+    assert!(!path.exists());
+}
+
+#[test]
+fn write_content_1() {
+    let path: PathBuf = "test/write_content/1/write-this.txt".into();
+    assert!(!path.exists());
+
+    let mut p = Parser::new("test/write_content/1/write-content.arcana").unwrap();
+    p.parse().unwrap();
+
+    assert!(path.exists());
+
+    assert_eq!(
+        "some content here",
+        std::fs::read_to_string(&path).unwrap().lines().collect::<Vec<&str>>().join("\n"),
+    );
+
+    std::fs::remove_file(path).unwrap();
+
+    assert_eq!("", p.as_output());
+}
+
+#[test]
+fn write_content_2() {
+    let path: PathBuf = "test/write_content/2/new-file.txt".into();
+    if path.exists() {
+        std::fs::remove_file(&path).unwrap();
+    }
+
+    let mut p = Parser::new("test/write_content/2/write.arcana").unwrap();
+    p.parse().unwrap();
+
+    assert!(path.exists());
+
+    assert_eq!(
+        "NAME: Write Content 2\nDATE: 2024-09-17",
+        std::fs::read_to_string(&path).unwrap().lines().collect::<Vec<&str>>().join("\n"),
+    );
+
+    std::fs::remove_file(path).unwrap();
+
+    assert_eq!("", p.as_output());
+}
+
+#[test]
+fn copy_path_1() {
+    let path: PathBuf = "test/copy_path/1/to-here.txt".into();
+    assert!(!path.exists());
+
+    let mut p = Parser::new("test/copy_path/1/copy.arcana").unwrap();
+    p.parse().unwrap();
+
+    assert!(path.exists());
+
+    assert_eq!(
+        "This should be the content.",
+        std::fs::read_to_string(&path).unwrap().lines().collect::<Vec<&str>>().join("\n"),
+    );
+
+    std::fs::remove_file(path).unwrap();
+
     assert_eq!("", p.as_output());
 }

@@ -1,0 +1,5 @@
+This\
+%{$loop}\
+( is a loop)\
+( is not a loop)\
+.

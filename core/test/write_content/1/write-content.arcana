@@ -1,0 +1,1 @@
+={path}("./write-this.txt")={here}("some content here")^{"${path|path}"}(${here})

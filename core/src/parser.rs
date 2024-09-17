@@ -65,6 +65,8 @@ enum IncludeFileMod {
 enum ForFileMod {
     Ext(String),
     Reverse,
+    Files,
+    Dirs,
 }
 
 #[derive(Clone)]
@@ -84,6 +86,16 @@ enum IfCondition {
     Lt,
     Le,
     Truthy
+}
+
+#[derive(Default)]
+struct LoopFile {
+    path: PathBuf,
+    is_dir: bool,
+    is_file: bool,
+    ext: Option<String>,
+    stem: Option<String>,
+    name: Option<String>,
 }
 
 /// The parser for Arcana templates.
@@ -393,8 +405,41 @@ impl Parser {
         Self::new_internal(template, Some(content), Some(context))
     }
 
+    /// Create a new parser with an input string and pseudo-path.
+    ///
+    /// # Arguments
+    ///
+    /// * `template` - The path to the template.
+    /// * `context` - The path to the context.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use {
+    ///     arcana_core::{ JsonContext, Parser },
+    ///     std::fs::canonicalize,
+    /// };
+    ///
+    /// let mut p = Parser::from_string_and_path(
+    ///     "./fake.path",
+    ///     concat!(
+    ///         "={title}(\"Here is the title\")\\\n",
+    ///         "${title|replace \" \" \"\"|lower}",
+    ///     ).to_owned(),
+    /// ).unwrap();
+    /// p.parse().unwrap();
+    /// assert_eq!("hereisthetitle", p.as_output());
+    /// ```
+    pub
+    fn from_string_and_path<T>(template: T, content: String) -> Result<Self>
+    where
+        T: AsRef<Path>,
+    {
+        Self::new_internal(template, Some(content), None)
+    }
+
     fn esc_endblock(&mut self) {
-        self.src_mut().take(consts::block::esc::ESCAPE.len());
+        self.src_mut().take(1);
         let taken = self.src_mut().take(1).unwrap();
         self.output.push_str(&taken);
     }
@@ -422,22 +467,6 @@ impl Parser {
 
         self.src_mut().take(end.len()).unwrap();
         Ok(())
-    }
-
-    fn ignore(&mut self) -> Result<bool> {
-        if self.src().pos().starts_with(consts::block::IGNORE) {
-            self.until_end(consts::block::ENDIGNORE, Error::UnterminatedTag(
-                "ignore".to_owned(),
-                self.src().coord(),
-                self.src().file().to_owned(),
-            ))?;
-            self.src_mut().force_eof();
-
-            Ok(true)
-        }
-        else {
-            Ok(false)
-        }
     }
 
     fn comment(&mut self) -> Result<bool> {
@@ -525,26 +554,32 @@ impl Parser {
         f(ctx)
     }
 
-    fn path(&mut self) -> Result<String> {
+    fn path(&mut self, bypass: bool) -> Result<String> {
         let start = self.src().coord();
 
         self.src_mut().take(consts::PATH.len()).unwrap();
 
-        let mut path_str = String::new();
-        loop {
-            self.unexpected_eof(|| Error::UnterminatedPath(
-                start, self.src().file().to_owned(),
-            ))?;
+        let output = self.spawn_sealed_internal_parser(|p| {
+            while !p.src().eof() && !p.src().pos().starts_with(consts::PATH) {
+                // if an escaped quote is encountered
+                if p.src().pos().starts_with(consts::esc::PATH) {
+                    // take the backslash
+                    p.src_mut().take(1);
+                }
 
-            if self.src().pos().starts_with(consts::PATH) {
-                self.src_mut().take(consts::PATH.len());
-                break;
+                p.parse_next(bypass)?;
             }
 
-            path_str.push_str(&self.src_mut().take(1).unwrap());
-        }
+            p.unexpected_eof(|| Error::UnterminatedPath(
+                start, p.src().file().to_owned(),
+            ))?;
 
-        Ok(path_str)
+            p.src_mut().take(consts::PATH.len());
+
+            Ok(())
+        })?;
+
+        Ok(output)
     }
 
     fn alias<S>(&mut self, tag_name: S) -> Result<String>
@@ -581,13 +616,13 @@ impl Parser {
         Ok(alias_str)
     }
 
-    fn pathlike<S>(&mut self, tag_name: S) -> Result<PathBuf>
+    fn pathlike<S>(&mut self, tag_name: S, bypass: bool) -> Result<PathBuf>
     where
         S: AsRef<str>
     {
         // is a literal path
         if self.src().pos().starts_with(consts::PATH) {
-            let path_str = self.path()?;
+            let path_str = self.path(bypass)?;
 
             Ok(PathBuf::from(path_str))
         }
@@ -598,7 +633,7 @@ impl Parser {
         }
     }
 
-    fn extends(&mut self) -> Result<bool> {
+    fn extends(&mut self, bypass: bool) -> Result<bool> {
         if !self.src().pos().starts_with(consts::block::EXTENDS) {
             return Ok(false);
         }
@@ -621,7 +656,7 @@ impl Parser {
         // trim until the first characters
         self.src_mut().trim_start();
 
-        let path = self.pathlike(TAG_NAME)?;
+        let path = self.pathlike(TAG_NAME, bypass)?;
         let path = self.normalize_path(path);
 
         // trim until the closing tag
@@ -643,7 +678,7 @@ impl Parser {
         Ok(true)
     }
 
-    fn source(&mut self) -> Result<bool> {
+    fn source(&mut self, bypass: bool) -> Result<bool> {
         if !self.src().pos().starts_with(consts::block::SOURCE) {
             return Ok(false);
         }
@@ -664,7 +699,7 @@ impl Parser {
             self.src().file().to_owned(),
         ))?;
 
-        let path = self.pathlike(TAG_NAME)?;
+        let path = self.pathlike(TAG_NAME, bypass)?;
         let path = self.normalize_path(path);
 
         self.src_mut().trim_start();
@@ -726,7 +761,7 @@ impl Parser {
         Ok(true)
     }
 
-    fn include_content_mod(&mut self, start: Coordinate) -> Result<Option<Vec<IncludeContentMod>>> {
+    fn include_content_mod(&mut self, start: Coordinate, bypass: bool) -> Result<Option<Vec<IncludeContentMod>>> {
         if !self.src().pos().starts_with(consts::block::MODIFIER) {
             return Ok(None);
         }
@@ -850,7 +885,7 @@ impl Parser {
                     return Err(self.illegal_character("include-content"));
                 }
 
-                let from = self.path()?;
+                let from = self.path(bypass)?;
 
                 self.src_mut().trim_start();
                 self.unexpected_eof(|| Error::UnterminatedTag(
@@ -863,7 +898,7 @@ impl Parser {
                     return Err(self.illegal_character("include-content"));
                 }
 
-                let to = self.path()?;
+                let to = self.path(bypass)?;
 
                 mods.push(IncludeContentMod::Replace(from, to));
             }
@@ -914,7 +949,7 @@ impl Parser {
             self.src().file().to_owned(),
         ))?;
 
-        let mods = self.include_content_mod(start)?;
+        let mods = self.include_content_mod(start, bypass)?;
 
         if !self.src().pos().starts_with(consts::block::ENDTAG) {
             return Err(self.illegal_character("include-content"));
@@ -1063,11 +1098,17 @@ impl Parser {
         Ok(Some(mods))
     }
 
-    fn chain_start<S>(&mut self, tag: S, coord: Coordinate) -> Result<()>
+    fn do_trim_start<S>(&mut self, tag: S, coord: Coordinate) -> Result<()>
     where
         S: AsRef<str>
     {
-        if self.src().pos().starts_with(consts::block::CHAIN) {
+        if !self.src().pos().starts_with(consts::block::TRIM) &&
+            !self.src().pos().starts_with(consts::block::STARTBLOCK)
+        {
+            self.illegal_character(&tag);
+        }
+
+        if self.src().pos().starts_with(consts::block::TRIM) {
             // take chain and trim until startblock
             self.src_mut().take(1);
             self.src_mut().trim_start_multiline();
@@ -1132,7 +1173,7 @@ impl Parser {
 
         unexpected_eof(self, start)?;
 
-        let path = self.pathlike(TAG_NAME)?;
+        let path = self.pathlike(TAG_NAME, bypass)?;
         let path = self.normalize_path(path);
 
         self.src_mut().trim_start();
@@ -1161,34 +1202,31 @@ impl Parser {
 
         self.src_mut().take(1);
 
-        if self.src().pos().starts_with(consts::block::CHAIN) ||
-            self.src().pos().starts_with(consts::block::STARTBLOCK)
-        {
-            self.chain_start(TAG_NAME, start)?;
+        let has_block = !self.trim_or_end();
 
-            let output = self.spawn_sealed_internal_parser(|p| {
-                while !p.src().eof() && !p.src().pos().starts_with(consts::block::ENDBLOCK) {
-                    p.parse_next(bypass)?;
-                }
-
-                unexpected_eof(p, start)?;
-                p.src_mut().take(1);
-
-                let block_output = std::mem::take(&mut p.output);
-                p.set_json_value(consts::CONTENT, block_output.into())?;
-
-                let mut file_output = p.include_file_parse(path, is_raw, is_md, bypass)?;
-                std::mem::swap(&mut file_output, &mut p.output);
-                Ok(())
-            })?;
-
-            self.output.push_str(&output);
-        }
-        else {
+        if !has_block {
             let output = self.include_file_parse(path, is_raw, is_md, bypass)?;
             self.output.push_str(&output);
+            return Ok(true);
         }
 
+        let output = self.spawn_sealed_internal_parser(|p| {
+            while !p.src().eof() && !p.src().pos().starts_with(consts::block::ENDBLOCK) {
+                p.parse_next(bypass)?;
+            }
+
+            unexpected_eof(p, start)?;
+            p.src_mut().take(1);
+
+            let block_output = std::mem::take(&mut p.output);
+            p.set_json_value(consts::CONTENT, block_output.into())?;
+
+            let mut file_output = p.include_file_parse(path, is_raw, is_md, bypass)?;
+            std::mem::swap(&mut file_output, &mut p.output);
+            Ok(())
+        })?;
+
+        self.output.push_str(&output);
 
         Ok(true)
     }
@@ -1231,39 +1269,31 @@ impl Parser {
         }
     }
 
-    fn chain_or_end<S>(&mut self, tag: S, coord: Coordinate) -> Result<bool>
-    where
-        S: AsRef<str>
-    {
+    fn trim_or_end(&mut self) -> bool {
         // if eof or no chain and no startblock, then it is a valid endpoint
         if self.src().eof() ||
             (
-                !self.src().pos().starts_with(consts::block::CHAIN) &&
+                !self.src().pos().starts_with(consts::block::TRIM) &&
                 !self.src().pos().starts_with(consts::block::STARTBLOCK)
             )
         {
-            return Ok(true);
+            return true;
         }
 
-        if self.src().pos().starts_with(consts::block::CHAIN) {
+        if self.src().pos().starts_with(consts::block::TRIM) {
             // take chain
             self.src_mut().take(1);
             self.src_mut().trim_start_multiline();
-            self.unexpected_eof(|| Error::UnterminatedTag(
-                tag.as_ref().to_owned(),
-                coord,
-                self.src().file().to_owned()
-            ))?;
 
             if !self.src().pos().starts_with(consts::block::STARTBLOCK) {
-                return Err(self.illegal_character(format!("else-{}", tag.as_ref())));
+                return true;
             }
         }
 
         // must be startblock
         self.src_mut().take(1);
 
-        Ok(false)
+        false
     }
 
     fn if_is_true<A, O>(
@@ -1416,7 +1446,7 @@ impl Parser {
 
         self.src_mut().take(1);
 
-        self.chain_start("if", start)?;
+        self.do_trim_start("if", start)?;
 
         // parse if contents
         let if_output = self.spawn_sealed_internal_parser(|p| {
@@ -1436,7 +1466,6 @@ impl Parser {
             self.output.push_str(&if_output);
         }
 
-        let start = self.src().coord();
         fn unexpected_eof_else(p: &mut Parser, coords: Coordinate) -> Result<()> {
             p.unexpected_eof(|| Error::UnterminatedTag(
                 "else".to_owned(),
@@ -1446,7 +1475,7 @@ impl Parser {
         }
 
         // if eof or no chain and no startblock, then it is a valid endpoint
-        if self.chain_or_end("if", start)? {
+        if self.trim_or_end() {
             return Ok(true);
         }
 
@@ -1471,7 +1500,7 @@ impl Parser {
         Ok(true)
     }
 
-    fn for_file_mods(&mut self, start: Coordinate) -> Result<Option<Vec<ForFileMod>>> {
+    fn for_file_mods(&mut self, start: Coordinate, bypass: bool) -> Result<Option<Vec<ForFileMod>>> {
         if !self.src().pos().starts_with(consts::block::MODIFIER) {
             return Ok(None);
         }
@@ -1496,13 +1525,21 @@ impl Parser {
             if self.src().pos().starts_with(consts::modif::EXT) {
                 self.src_mut().take(consts::modif::EXT.len());
                 self.src_mut().trim_start();
-                let path = self.path()?;
+                let path = self.path(bypass)?;
 
                 mods.push(ForFileMod::Ext(path));
             }
             else if self.src().pos().starts_with(consts::modif::REVERSE) {
                 self.src_mut().take(consts::modif::REVERSE.len());
                 mods.push(ForFileMod::Reverse);
+            }
+            else if self.src().pos().starts_with(consts::modif::FILES) {
+                self.src_mut().take(consts::modif::FILES.len());
+                mods.push(ForFileMod::Files);
+            }
+            else if self.src().pos().starts_with(consts::modif::DIRS) {
+                self.src_mut().take(consts::modif::DIRS.len());
+                mods.push(ForFileMod::Dirs);
             }
             else {
                 return Err(self.illegal_character(TAG_NAME));
@@ -1523,12 +1560,15 @@ impl Parser {
     where
         A: Into<Alias>
     {
+        let mut value_dir = self.src().file().to_owned();
+        value_dir.pop();
+
         if let Some(ctx) = self.ctx_mut() {
-            ctx.set_value(alias, val)?;
+            ctx.set_value(alias, value_dir, val)?;
         }
         else {
             let mut new_ctx = JsonContext::faux_context(&self.path)?;
-            new_ctx.set_value(alias, val)?;
+            new_ctx.set_value(alias, value_dir, val)?;
             self.context = Some(new_ctx);
         }
 
@@ -1598,11 +1638,11 @@ impl Parser {
         self.in_keyword(TAG_NAME)?;
         unexpected_eof_for(self, start)?;
 
-        let path = self.pathlike(TAG_NAME)?;
+        let path = self.pathlike(TAG_NAME, bypass)?;
         let path = self.normalize_path(path);
 
         self.src_mut().trim_start();
-        let mods = self.for_file_mods(start)?;
+        let mods = self.for_file_mods(start, bypass)?;
         self.src_mut().trim_start();
         unexpected_eof_for(self, start)?;
 
@@ -1614,7 +1654,7 @@ impl Parser {
         self.src_mut().take(1);
 
         // handle chain and startblock
-        self.chain_start("for-file", start)?;
+        self.do_trim_start("for-file", start)?;
 
         let for_start = self.src().coord();
 
@@ -1630,7 +1670,7 @@ impl Parser {
             )
             .unwrap_or(Vec::new());
 
-        let reverse = mods
+        let reverse = mods.as_ref()
             .map(|m| m.iter()
                 .filter_map(|m| if let ForFileMod::Reverse = m {
                     Some(())
@@ -1643,6 +1683,19 @@ impl Parser {
             .unwrap_or(Vec::new())
             .len() % 2 != 0;
 
+        let files_only = mods.as_ref()
+            .map(|m| m.iter().any(|m| matches!(m, ForFileMod::Files)))
+            .unwrap_or(false);
+
+        let dirs_only = if !files_only {
+            mods
+                .map(|m| m.iter().any(|m| matches!(m, ForFileMod::Dirs)))
+                .unwrap_or(false)
+        }
+        else {
+            false
+        };
+
         let mut items = if bypass {
             vec![]
         }
@@ -1652,33 +1705,38 @@ impl Parser {
                 .map(|entry_res| {
                     let entry = entry_res.map_err(|e| Error::IO(e, p.clone()))?;
                     let path = entry.path();
-                    let ext = if let Some(ext) = path.extension() {
-                        if let Some(ext) = ext.to_str() {
-                            ext
-                        }
-                        else {
-                            ""
-                        }
-                    }
-                    else {
-                        ""
-                    };
+                    let ext = path.extension().and_then(|e| e.to_str()).map(|e| e.to_owned());
+                    let stem = path.file_stem().and_then(|f| f.to_str())
+                        .map(|f| f.to_owned());
+                    let name = path.file_name().and_then(|f| f.to_str())
+                        .map(|f| f.to_owned());
 
-                    if !path.is_file() ||
-                        !extensions.is_empty() && !extensions.contains(&ext.to_owned())
+                    if (files_only && !path.is_file()) ||
+                        (dirs_only && !path.is_dir()) ||
+                        (!extensions.is_empty() && (
+                            ext.is_none() ||
+                            (ext.is_some() && !extensions.contains(ext.as_ref().unwrap()))
+                        ))
                     {
                         return Ok(None);
                     }
 
-                    Ok(Some(path))
+                    Ok(Some(LoopFile {
+                        ext,
+                        stem,
+                        name,
+                        is_file: path.is_file(),
+                        is_dir: path.is_dir(),
+                        path,
+                    }))
                 })
-                .collect::<Result<Vec<Option<PathBuf>>>>()?
+                .collect::<Result<Vec<Option<LoopFile>>>>()?
                 .into_iter()
                 .flatten()
-                .collect::<Vec<PathBuf>>()
+                .collect::<Vec<LoopFile>>()
         };
 
-        items.sort_unstable();
+        items.sort_unstable_by(|f1, f2| f1.path.cmp(&f2.path));
 
         if reverse {
             items.reverse();
@@ -1687,7 +1745,7 @@ impl Parser {
         let len = items.len();
 
         let has_items = if items.is_empty() {
-            items = vec![ PathBuf::new(), ];
+            items = vec![ LoopFile::default(), ];
             false
         }
         else {
@@ -1699,7 +1757,7 @@ impl Parser {
             // revert back to start of loop
             self.src_mut().set_coord(for_start);
 
-            let item_str = if let Some(item_str) = item.to_str() {
+            let item_str = if let Some(item_str) = item.path.to_str() {
                 item_str.to_owned()
             }
             else {
@@ -1708,11 +1766,18 @@ impl Parser {
 
             let for_output = self.spawn_sealed_internal_parser(|p| {
                 // place value into map
-                p.set_json_value(alias_cl.clone(), item_str.into())?;
+                p.set_json_value(alias_cl.clone(), item_str.clone().into())?;
 
                 // setup loop context
                 if !bypass && has_items {
                     p.loop_context(idx, len)?;
+
+                    p.set_json_value("$loop.entry.path".to_owned(), item_str.clone().into())?;
+                    p.set_json_value("$loop.entry.ext".to_owned(), item.ext.clone().into())?;
+                    p.set_json_value("$loop.entry.stem".to_owned(), item.stem.clone().into())?;
+                    p.set_json_value("$loop.entry.name".to_owned(), item.name.clone().into())?;
+                    p.set_json_value("$loop.entry.is_file".to_owned(), item.is_file.into())?;
+                    p.set_json_value("$loop.entry.is_dir".to_owned(), item.is_dir.into())?;
                 }
 
                 // parse next until endblock.
@@ -1733,7 +1798,7 @@ impl Parser {
                 self.output.push_str(&for_output);
             }
 
-            if self.chain_or_end("for-file", start)? {
+            if self.trim_or_end() {
                 continue;
             }
 
@@ -1868,7 +1933,7 @@ impl Parser {
         self.src_mut().take(1);
 
         // handle chain and startblock
-        self.chain_start(TAG_NAME, start)?;
+        self.do_trim_start(TAG_NAME, start)?;
 
         let for_start = self.src().coord();
 
@@ -1967,7 +2032,7 @@ impl Parser {
                 self.output.push_str(&for_output);
             }
 
-            if self.chain_or_end(TAG_NAME, start)? {
+            if self.trim_or_end() {
                 continue;
             }
 
@@ -2088,13 +2153,7 @@ impl Parser {
 
         unexpected_eof(self, start)?;
 
-        if !self.src().pos().starts_with(consts::block::CHAIN) &&
-            !self.src().pos().starts_with(consts::block::STARTBLOCK)
-        {
-            return Err(self.illegal_character(TAG_NAME));
-        }
-
-        self.chain_start(TAG_NAME, start)?;
+        self.do_trim_start(TAG_NAME, start)?;
 
         let output = self.spawn_sealed_internal_parser(|p| {
             while !p.src().eof() && !p.src().pos().starts_with(consts::block::ENDBLOCK) {
@@ -2106,15 +2165,17 @@ impl Parser {
             Ok(())
         })?;
 
-        if !bypass {
-            let s_path = self.path.clone();
-
-            if self.ctx().is_none() {
-                self.context = Some(JsonContext::faux_context(&self.path)?);
-            }
-
-            self.enforce_context(|ctx| ctx.set_value(alias, JsonContext::parse_json(&s_path, output)?))?;
+        if bypass {
+            return Ok(true);
         }
+
+        let s_path = self.path.clone();
+
+        if self.ctx().is_none() {
+            self.context = Some(JsonContext::faux_context(&self.path)?);
+        }
+
+        self.set_json_value(alias, JsonContext::parse_json(s_path, output)?)?;
 
         Ok(true)
     }
@@ -2151,7 +2212,223 @@ impl Parser {
 
         self.src_mut().take(1);
 
+        if alias == consts::CONTENT {
+            self.output = String::new();
+            return Ok(true);
+        }
+
         self.remove_value(alias);
+
+        Ok(true)
+    }
+
+    fn trim_start_tag(&mut self) -> Result<bool> {
+        // if doesn't start with trim character or trim character is not the
+        // final character on the line
+        if !self.src().pos().starts_with(consts::block::TRIM_LF) && (
+            !self.src().pos().starts_with(consts::block::TRIM) ||
+            self.src().pos().len() > 1
+        ) {
+            return Ok(false);
+        }
+
+        self.src_mut().take(1);
+        self.src_mut().trim_start_multiline();
+
+        Ok(true)
+    }
+
+    fn delete_path(&mut self, bypass: bool) -> Result<bool> {
+        //-{ "some/path/here.txt" }
+
+        if !self.src().pos().starts_with(consts::block::DELETE_PATH) {
+            return Ok(false);
+        }
+
+        const TAG_NAME: &str = "delete-path";
+
+        fn unexpected_eof(p: &mut Parser, coord: Coordinate) -> Result<()> {
+            p.unexpected_eof(|| Error::UnterminatedTag(
+                TAG_NAME.to_owned(),
+                coord,
+                p.src().file().to_owned()
+            ))
+        }
+
+        let start = self.src().coord();
+        self.src_mut().take(consts::block::DELETE_PATH.len());
+        // "some/path/here.txt" }
+        self.src_mut().trim_start();
+        //"some/path/here.txt" }
+
+        unexpected_eof(self, start)?;
+
+        let path = self.pathlike(TAG_NAME, bypass)?;
+        // }
+
+        self.src_mut().trim_start();
+        //}
+
+        if !self.src().pos().starts_with(consts::block::ENDTAG) {
+            return Err(self.illegal_character(TAG_NAME));
+        }
+
+        self.src_mut().take(1);
+
+        let mut srcdir = self.src().file().to_owned();
+        srcdir.pop();
+        let path = JsonContext::normalize_path(srcdir, path);
+
+        let is_file = path.is_file();
+        if bypass || !is_file {
+            return Ok(true);
+        }
+
+        std::fs::remove_file(path).map_err(|e| Error::IO(e, self.src().file().to_owned()))?;
+
+        Ok(true)
+    }
+
+    fn copy_path(&mut self, bypass: bool) -> Result<bool> {
+        //tag from            to
+        //~{  "this/path.txt" "that/path.txt"  }
+
+        if !self.src().pos().starts_with(consts::block::COPY_PATH) {
+            return Ok(false);
+        }
+
+        const TAG_NAME: &str = "copy-path";
+
+        fn unexpected_eof(p: &mut Parser, coord: Coordinate) -> Result<()> {
+            p.unexpected_eof(|| Error::UnterminatedTag(
+                TAG_NAME.to_owned(),
+                coord,
+                p.src().file().to_owned()
+            ))
+        }
+
+        let start = self.src().coord();
+        self.src_mut().take(consts::block::COPY_PATH.len());
+        //  "this/path.txt" "that/path.txt"  }
+        self.src_mut().trim_start();
+        //"this/path.txt" "that/path.txt"  }
+
+        unexpected_eof(self, start)?;
+
+        let from = self.pathlike(TAG_NAME, bypass)?;
+        // "that/path.txt"  }
+
+        self.src_mut().trim_start();
+        //"that/path.txt"  }
+
+        let to = self.pathlike(TAG_NAME, bypass)?;
+        //  }
+
+        self.src_mut().trim_start();
+        //}
+
+        if !self.src().pos().starts_with(consts::block::ENDTAG) {
+            return Err(self.illegal_character(TAG_NAME));
+        }
+
+        self.src_mut().take(1);
+
+        let mut srcdir = self.src().file().to_owned();
+        srcdir.pop();
+        let from = JsonContext::normalize_path(srcdir.to_owned(), from);
+        let to = JsonContext::normalize_path(srcdir, to);
+
+        if bypass || !from.is_file() {
+            return Ok(true);
+        }
+
+        let mut to_dir = to.clone();
+        to_dir.pop();
+
+        if !to_dir.is_dir() {
+            std::fs::create_dir_all(to_dir)
+                .map_err(|e| Error::IO(e, self.src().file().to_owned()))?;
+        }
+
+        std::fs::copy(from, to).map_err(|e| Error::IO(e, self.src().file().to_owned()))?;
+
+        Ok(true)
+    }
+
+    fn write_content(&mut self, bypass: bool) -> Result<bool> {
+        //tag to                      content
+        //^{  "some/path/here.txt"  }(&{"this/file.arcana"})
+
+        if !self.src().pos().starts_with(consts::block::WRITE_CONTENT) {
+            return Ok(false);
+        }
+
+        const TAG_NAME: &str = "write-content";
+
+        fn unexpected_eof(p: &mut Parser, coord: Coordinate) -> Result<()> {
+            p.unexpected_eof(|| Error::UnterminatedTag(
+                TAG_NAME.to_owned(),
+                coord,
+                p.src().file().to_owned()
+            ))
+        }
+
+        let start = self.src().coord();
+        self.src_mut().take(consts::block::WRITE_CONTENT.len());
+        //  "some/path/here.txt"  }(&{"this/file.arcana"})
+        self.src_mut().trim_start();
+        //"some/path/here.txt"  }(&{"this/file.arcana"})
+
+        unexpected_eof(self, start)?;
+
+        let to = self.pathlike(TAG_NAME, bypass)?;
+        //  }(&{"this/file.arcana"})
+
+        self.src_mut().trim_start();
+        //}(&{"this/file.arcana"})
+
+        if !self.src().pos().starts_with(consts::block::ENDTAG) {
+            return Err(self.illegal_character(TAG_NAME));
+        }
+
+        self.src_mut().take(1);
+        //(&{"this/file.arcana"})
+
+        self.do_trim_start(TAG_NAME, start)?;
+        //(&{"this/file.arcana"})
+
+        let content = self.spawn_sealed_internal_parser(|p| {
+            let start = p.src().coord();
+
+            while !p.src().eof() && !p.src().pos().starts_with(consts::block::ENDBLOCK) {
+                p.parse_next(bypass)?;
+            }
+
+            unexpected_eof(p, start)?;
+            p.src_mut().take(1);
+
+            Ok(())
+        })?;
+        // ""
+
+        if bypass {
+            return Ok(true);
+        }
+
+        let mut srcdir = self.src().file().to_owned();
+        srcdir.pop();
+
+        let to = JsonContext::normalize_path(srcdir, to);
+
+        let mut to_dir = to.clone();
+        to_dir.pop();
+
+        if !to_dir.is_dir() {
+            std::fs::create_dir_all(to_dir)
+                .map_err(|e| Error::IO(e, self.src().file().to_owned()))?;
+        }
+
+        std::fs::write(to, content.as_bytes()).map_err(|e| Error::IO(e, self.src().file().to_owned()))?;
 
         Ok(true)
     }
@@ -2169,9 +2446,13 @@ impl Parser {
     }
 
     fn parse_next(&mut self, bypass: bool) -> Result<()> {
+        // trim character overlaps with escapes, but MUST be the final character
+        // on the line.
+        if self.trim_start_tag()? {
+            // do nothing
+        }
         // is escaped (2 char pattern)
-        if self.src().pos().starts_with(consts::block::esc::MODIFIER) ||
-            self.src().pos().starts_with(consts::block::esc::IGNORE) ||
+        else if self.src().pos().starts_with(consts::block::esc::MODIFIER) ||
             self.src().pos().starts_with(consts::block::esc::COMMENT) ||
             self.src().pos().starts_with(consts::block::esc::EXTENDS) ||
             self.src().pos().starts_with(consts::block::esc::SOURCE) ||
@@ -2179,9 +2460,12 @@ impl Parser {
             self.src().pos().starts_with(consts::block::esc::INCLUDE_CONTENT) ||
             self.src().pos().starts_with(consts::block::esc::EXPRESSION) ||
             self.src().pos().starts_with(consts::block::esc::SET_ITEM) ||
-            self.src().pos().starts_with(consts::block::esc::UNSET_ITEM)
+            self.src().pos().starts_with(consts::block::esc::UNSET_ITEM) ||
+            self.src().pos().starts_with(consts::block::esc::DELETE_PATH) ||
+            self.src().pos().starts_with(consts::block::esc::COPY_PATH) ||
+            self.src().pos().starts_with(consts::block::esc::WRITE_CONTENT)
         {
-            self.src_mut().take(consts::block::esc::ESCAPE.len());
+            self.src_mut().take(1);
             let taken = self.src_mut().take(2).unwrap();
             self.output.push_str(&taken);
         }
@@ -2193,14 +2477,12 @@ impl Parser {
         {
             self.esc_endblock();
         }
-        // is ignored
-        else if self.ignore()? ||
-            // is a comment
-            self.comment()? ||
+        // is a comment
+        else if self.comment()? ||
             // is extending
-            self.extends()? ||
+            self.extends(bypass)? ||
             // is sourcing
-            self.source()? ||
+            self.source(bypass)? ||
             // is include-file
             self.include_file(bypass)? ||
             // is include-content
@@ -2214,7 +2496,13 @@ impl Parser {
             // is set-item
             self.set_item(bypass)? ||
             // is remove-item
-            self.unset_item()?
+            self.unset_item()? ||
+            // is delete-path
+            self.delete_path(bypass)? ||
+            // is copy-path
+            self.copy_path(bypass)? ||
+            // is write-content
+            self.write_content(bypass)?
         {
             // no action required
         }

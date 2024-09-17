@@ -1,5 +1,5 @@
-.{ "ctx.json" }@{ file in files | paths }-
+.{ "ctx.json" }@{ file in files | paths }\
 (%{ !$loop.first }(
-)&{ file })-
+)&{ file })\
 (No items.)
 End.
