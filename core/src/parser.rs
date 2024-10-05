@@ -2446,9 +2446,21 @@ impl Parser {
     }
 
     fn parse_next(&mut self, bypass: bool) -> Result<()> {
+        // escaped trim_lf: \\<newline>
+        if self.src().pos().starts_with(consts::block::esc::TRIM_LF) {
+            self.src_mut().take(1);
+            let taken = self.src_mut().take(2).unwrap();
+            self.output.push_str(&taken);
+        }
+        // escaped backslash: \\
+        if self.src().pos().starts_with(consts::block::esc::TRIM) {
+            self.src_mut().take(1);
+            let taken = self.src_mut().take(1).unwrap();
+            self.output.push_str(&taken);
+        }
         // trim character overlaps with escapes, but MUST be the final character
         // on the line.
-        if self.trim_start_tag()? {
+        else if self.trim_start_tag()? {
             // do nothing
         }
         // is escaped (2 char pattern)

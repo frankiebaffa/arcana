@@ -62,3 +62,9 @@ const BLOCK: &str = "\\(";
 
 pub(crate)
 const ENDBLOCK: &str = "\\)";
+
+pub(crate)
+const TRIM_LF: &str = "\\\\\n";
+
+pub(crate)
+const TRIM: &str = "\\\\";

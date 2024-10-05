@@ -142,6 +142,46 @@ fn escape_1() {
 }
 
 #[test]
+fn escape_2() {
+    let mut p = Parser::new("test/escape/2/esc.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!(
+        "\\\nA test.",
+        p.as_output()
+    );
+}
+
+#[test]
+fn escape_3() {
+    let mut p = Parser::new("test/escape/3/esc.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!(
+        concat!(
+            "This is a test with some escaped breaks inside of it. And a ",
+            "literal \\ character. And \\\nthat.",
+        ),
+        p.as_output()
+    );
+}
+
+#[test]
+fn escape_4() {
+    let mut p = Parser::new("test/escape/4/esc.arcana").unwrap();
+    p.parse().unwrap();
+    assert_eq!(
+        "This has a literal backslash followed by a trim right \\there.",
+        p.as_output()
+    );
+}
+
+#[test]
+#[should_panic]
+fn escape_5() {
+    let mut p = Parser::new("test/escape/5/esc.arcana").unwrap();
+    p.parse().unwrap();
+}
+
+#[test]
 fn parser_1() {
     let mut cf = current_dir().unwrap();
     cf.push("test/parser/1/test.txt");
